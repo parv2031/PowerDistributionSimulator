@@ -1,0 +1,59 @@
+#include <iostream>
+#include <algorithm>
+#include <vector>
+#include <stack>
+#include <queue>
+#include <unordered_map>
+#include <unordered_set>
+#include <cmath>
+#include <iomanip>
+#include <random>
+// for graphics
+// #include "raylib.h"
+// #include "raymath.h"
+
+using namespace std;
+
+// --- Global Variable  START---
+int resident_demand, hospital_demand, industry_demand, institute_demand;
+static random_device rd;
+static mt19937 g(rd());
+// --- Global Variable END---
+
+// vertex for power plant and substation
+class vertex_A
+{
+
+public:
+    string node_type = "";           // Type
+    float max_limit;                 // maximum load capacity of the substation and power plant
+    float current_downstream_demand; // Tracks actual load
+    int x, y;                        // Coordinates
+
+    // Constructor
+    vertex_A(string type) : node_type(type), max_limit(0), current_downstream_demand(0), x(0), y(0)
+    {
+    }
+};
+
+// vertex for consumers (mainly resident, hospital ,institute ,industry)
+class vertex_B
+{
+public:
+    int demand;
+    string node_type; // <-- Type
+    int x, y;         // <-- Coordinates
+
+    // Constructor
+    vertex_B(string type) : node_type(type), x(0), y(0)
+    {
+        if (type == "residential")
+            demand = resident_demand;
+        else if (type == "industrial")
+            demand = industry_demand;
+        else if (type == "institute")
+            demand = institute_demand;
+        else
+            demand = hospital_demand;
+    }
+};
