@@ -126,4 +126,91 @@ public:
 
         adj_substion_consumer[substation] = connect;
     }
+        void mapping(int powerplant, int substation, int consumer)
+    {
+        vector<vertex_A *> powerplants;
+        for (int i = 0; i < powerplant; i++)
+        {
+            powerplants.push_back(new vertex_A("power_plant"));
+        }
+        vector<vertex_A *> Substations;
+        vector<int> substations = distributor(consumer, substation);
+        for (auto val : substations)
+        {
+            vertex_A *sub = new vertex_A("substation");
+            substation_consumer_mapping(sub, val);
+            Substations.push_back(sub);
+        }
+        powerplant_substation_mapping(powerplants, Substations);
+    }
+
+    void powerplant_substation_mapping(vector<vertex_A *> &powerplants, vector<vertex_A *> &substations)
+    {
+        int powerplant_count = powerplants.size();
+        int substation_count = substations.size();
+
+        int substations_for_powerplants = (int)(0.4f * substation_count);                     // 40 percentage of substations connected directly to power plants
+        if (substation_count > 0 && powerplant_count > 0 && substations_for_powerplants == 0) // For security
+        {
+            substations_for_powerplants = 1;
+        }
+        vector<int> substation_indices(substation_count);
+        iota(substation_indices.begin(), substation_indices.end(), 0); // iota --> fill the vector with sequential values starting from 1
+        shuffle(substation_indices.begin(), substation_indices.end(), g);
+        int idx = 0;
+
+        // --- 1. Connect Power Plants to primary Substations ---
+        for (int i = 0; i < substations_for_powerplants; i++)
+        {
+            vertex_A *plant = powerplants[i % powerplant_count];
+            vertex_A *sub = substations[substation_indices[idx]];
+            Edge *edge = new Edge(plant, sub);
+
+            // Set edge loads based on the child substation
+            edge->current_load = sub->current_downstream_demand;
+            edge->max_load = 2 * sub->max_limit;
+
+            adj_power_substation[plant].push_back({sub, edge});
+        }
+        while (idx < substation_count)
+        {
+            if (idx == 0)
+                break;
+            int src_idx = rand() % idx;                               // Picks any previously placed parent
+            vertex_A *src = substations[substation_indices[src_idx]]; // Parent substation (can be primary or secondary)
+            vertex_A *dest = substations[substation_indices[idx]];    // Child substation
+            Edge *edge = new Edge(src, dest);
+
+            // Propagate loads up the tree
+            src->max_limit += dest->max_limit;                                 // Parent's limit must accommodate the child's limit
+            src->current_downstream_demand += dest->current_downstream_demand; // Parent's load increases
+
+            // Set edge loads based on the child substation
+            edge->current_load = dest->current_downstream_demand;
+            edge->max_load = dest->max_limit;
+
+            adj_power_substation[src].push_back({dest, edge});
+            idx++;
+        }
+
+        // --- 3. Set Power Plant total limits based on their children ---
+        for (auto &plant_entry : adj_power_substation)
+        {
+            vertex_A *plant = plant_entry.first;
+            if (plant->node_type != "power_plant")
+                continue;
+
+            float sum_substation_limits = 0;
+            float sum_substation_demands = 0;
+
+            for (auto &pair : plant_entry.second)
+            {
+                vertex_A *sub = pair.first; // This is a direct child substation
+                sum_substation_limits += sub->max_limit;
+                sum_substation_demands += sub->current_downstream_demand;
+            }
+            plant->max_limit = sum_substation_limits * 1.5f; // 150% of all substation's limit
+            plant->current_downstream_demand = sum_substation_demands;
+        }
+    }
 };
