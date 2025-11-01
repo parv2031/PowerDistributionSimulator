@@ -57,7 +57,12 @@ public:
             demand = hospital_demand;
     }
 };
-vector<int> distributor(int total_count, int divide_count)
+class Graph{
+public:
+    unordered_map<vertex_A *, vector<pair<vertex_B *, Edge *>>> adj_substion_consumer; // adj list of substation to consumers
+    unordered_map<vertex_A *, vector<pair<vertex_A *, Edge *>>> adj_power_substation;  // adj list of substation to substaiton and power_plant to substations
+private:
+    vector<int> distributor(int total_count, int divide_count)
     {
         if (divide_count <= 0)
             return {};
@@ -101,3 +106,24 @@ vector<int> distributor(int total_count, int divide_count)
         }
         return demand;
     }
+public:
+    void substation_consumer_mapping(vertex_A *substation, int consumers)
+    {
+        int hospital_count = 0.2f * consumers;
+        int industrial_count = 0.1f * consumers;
+        int institute_count = 0.2f * consumers;
+        int resident_count = consumers - (hospital_count + industrial_count + institute_count);
+
+        int total_demand = 0;
+        vector<pair<vertex_B *, Edge *>> connect;                                                          // contains vertices along with edges to be mapped to substation
+        total_demand += mapping_helper(substation, connect, "hospital", hospital_count, total_demand);     // hospitals
+        total_demand += mapping_helper(substation, connect, "industrial", industrial_count, total_demand); // industries
+        total_demand += mapping_helper(substation, connect, "institute", institute_count, total_demand);   // institutes
+        total_demand += mapping_helper(substation, connect, "residential", resident_count, total_demand);  // residents
+
+        substation->max_limit = total_demand * 1.5f;          // Node's max capacity (150% of demand)
+        substation->current_downstream_demand = total_demand; // Node's current load
+
+        adj_substion_consumer[substation] = connect;
+    }
+};
