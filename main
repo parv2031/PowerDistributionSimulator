@@ -57,3 +57,47 @@ public:
             demand = hospital_demand;
     }
 };
+vector<int> distributor(int total_count, int divide_count)
+    {
+        if (divide_count <= 0)
+            return {};
+        vector<int> weights(divide_count);
+        int weightconsumers = 0;
+        int base = total_count / divide_count;
+        int minWeight = max(1, base - (3 * base) / 10); // 30% less than average
+        int maxWeight = max(1, base + (3 * base) / 10); // 30% more than average
+        for (int i = 0; i < divide_count; i++)
+        {
+            weights[i] = rand() % (maxWeight - minWeight + 1) + minWeight;
+            weightconsumers += weights[i];
+        }
+
+        if (weightconsumers == 0)
+        { // Avoid divide by zero
+            for (int i = 0; i < divide_count; i++)
+                weights[i] = 1;
+            weightconsumers = divide_count;
+        }
+
+        vector<int> distribution(divide_count);
+        int distributedconsumers = 0;
+        for (int i = 0; i < divide_count - 1; i++)
+        {
+            distribution[i] = (long long)weights[i] * total_count / weightconsumers;
+            distributedconsumers += distribution[i];
+        }
+        distribution[divide_count - 1] = total_count - distributedconsumers;
+        return distribution;
+    }
+    // Helper function for mapping
+    int mapping_helper(vertex_A *&substation, vector<pair<vertex_B *, Edge *>> &connect, const string &type, int count, int demand)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            vertex_B *node = new vertex_B(type);
+            demand += node->demand;
+            Edge *edge = new Edge(substation, node);
+            connect.push_back({node, edge});
+        }
+        return demand;
+    }
