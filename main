@@ -21,7 +21,7 @@ static mt19937 g(rd());
 // --- Global Variable END---
 
 // vertex for power plant and substation
-class vertex_A
+class Vertix_A
 {
 
 public:
@@ -37,7 +37,7 @@ public:
 };
 
 // vertex for consumers (mainly resident, hospital ,institute ,industry)
-class vertex_B
+class Vertix_B
 {
 public:
     int demand;
@@ -59,8 +59,8 @@ public:
 };
 class Graph{
 public:
-    unordered_map<vertex_A *, vector<pair<vertex_B *, Edge *>>> adj_substion_consumer; // adj list of substation to consumers
-    unordered_map<vertex_A *, vector<pair<vertex_A *, Edge *>>> adj_power_substation;  // adj list of substation to substaiton and power_plant to substations
+    unordered_map<Vertix_A *, vector<pair<Vertix_B *, Edge *>>> adj_substion_consumer; // adj list of substation to consumers
+    unordered_map<Vertix_A *, vector<pair<Vertix_A *, Edge *>>> adj_power_substation;  // adj list of substation to substaiton and power_plant to substations
 private:
     vector<int> distributor(int total_count, int divide_count)
     {
@@ -95,11 +95,11 @@ private:
         return distribution;
     }
     // Helper function for mapping
-    int mapping_helper(vertex_A *&substation, vector<pair<vertex_B *, Edge *>> &connect, const string &type, int count, int demand)
+    int mapping_helper(Vertix_A *&substation, vector<pair<Vertix_B *, Edge *>> &connect, const string &type, int count, int demand)
     {
         for (int i = 0; i < count; i++)
         {
-            vertex_B *node = new vertex_B(type);
+            Vertix_B *node = new Vertix_B(type);
             demand += node->demand;
             Edge *edge = new Edge(substation, node);
             connect.push_back({node, edge});
@@ -107,7 +107,7 @@ private:
         return demand;
     }
 public:
-    void substation_consumer_mapping(vertex_A *substation, int consumers)
+    void substation_consumer_mapping(Vertix_A *substation, int consumers)
     {
         int hospital_count = 0.2f * consumers;
         int industrial_count = 0.1f * consumers;
@@ -126,25 +126,25 @@ public:
 
         adj_substion_consumer[substation] = connect;
     }
-        void mapping(int powerplant, int substation, int consumer)
+    void mapping(int powerplant, int substation, int consumer)
     {
         vector<vertex_A *> powerplants;
         for (int i = 0; i < powerplant; i++)
         {
-            powerplants.push_back(new vertex_A("power_plant"));
+            powerplants.push_back(new Vertix_A("power_plant"));
         }
-        vector<vertex_A *> Substations;
+        vector<Vertix_A *> Substations;
         vector<int> substations = distributor(consumer, substation);
         for (auto val : substations)
         {
-            vertex_A *sub = new vertex_A("substation");
+            Vertix_A *sub = new Vertix_A("substation");
             substation_consumer_mapping(sub, val);
             Substations.push_back(sub);
         }
         powerplant_substation_mapping(powerplants, Substations);
     }
 
-    void powerplant_substation_mapping(vector<vertex_A *> &powerplants, vector<vertex_A *> &substations)
+    void powerplant_substation_mapping(vector<Vertix_A *> &powerplants, vector<Vertix_A *> &substations)
     {
         int powerplant_count = powerplants.size();
         int substation_count = substations.size();
@@ -162,8 +162,8 @@ public:
         // --- 1. Connect Power Plants to primary Substations ---
         for (int i = 0; i < substations_for_powerplants; i++)
         {
-            vertex_A *plant = powerplants[i % powerplant_count];
-            vertex_A *sub = substations[substation_indices[idx]];
+            Vertix_A *plant = powerplants[i % powerplant_count];
+            Vertix_A *sub = substations[substation_indices[idx]];
             Edge *edge = new Edge(plant, sub);
 
             // Set edge loads based on the child substation
@@ -177,8 +177,8 @@ public:
             if (idx == 0)
                 break;
             int src_idx = rand() % idx;                               // Picks any previously placed parent
-            vertex_A *src = substations[substation_indices[src_idx]]; // Parent substation (can be primary or secondary)
-            vertex_A *dest = substations[substation_indices[idx]];    // Child substation
+            Vertix_A *src = substations[substation_indices[src_idx]]; // Parent substation (can be primary or secondary)
+            Vertix_A *dest = substations[substation_indices[idx]];    // Child substation
             Edge *edge = new Edge(src, dest);
 
             // Propagate loads up the tree
@@ -196,7 +196,7 @@ public:
         // --- 3. Set Power Plant total limits based on their children ---
         for (auto &plant_entry : adj_power_substation)
         {
-            vertex_A *plant = plant_entry.first;
+            Vertix_A *plant = plant_entry.first;
             if (plant->node_type != "power_plant")
                 continue;
 
@@ -205,7 +205,7 @@ public:
 
             for (auto &pair : plant_entry.second)
             {
-                vertex_A *sub = pair.first; // This is a direct child substation
+                Vertix_A *sub = pair.first; // This is a direct child substation
                 sum_substation_limits += sub->max_limit;
                 sum_substation_demands += sub->current_downstream_demand;
             }
@@ -214,3 +214,103 @@ public:
         }
     }
 };
+
+// --- NEW: Define Game States ---
+enum GameState
+{
+    STATE_INPUT,
+    STATE_VISUALIZATION
+};
+
+// --- RAYLIB MAIN FUNCTION ---
+int main()
+{
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+    srand((unsigned int)time(0)); // Seed random number generator
+
+    // --- 1. Initialize Raylib Window ---
+    const int screenWidth = 1280;
+    const int screenHeight = 720;
+    InitWindow(screenWidth, screenHeight, "Power Grid Visualizer");
+
+    // --- 2. Define States ---
+    GameState currentState = STATE_INPUT;
+
+    // --- 3. Variables for STATE_INPUT (Using basic Raylib) ---
+    const int inputFieldCount = 7;
+    const char *labels[inputFieldCount] = {
+        "Power Plants:", "Substations:", "Consumers:",
+        "Resident Demand:", "Hospital Demand:", "Industrial Demand:", "Institute Demand:"};
+    Rectangle textBoxes[inputFieldCount];
+    string inputStrings[inputFieldCount];
+    int activeTextBox = -1;          // Index of the currently selected text box, -1 for none
+
+    // Set default values for the strings
+    inputStrings[0] = "3";
+    inputStrings[1] = "18";
+    inputStrings[2] = "100"; // scaled by 1/9
+    inputStrings[3] = "10";
+    inputStrings[4] = "100";
+    inputStrings[5] = "500";
+    inputStrings[6] = "80";
+
+    Rectangle startButton;
+    bool showCursor = false;
+    int framesCounter = 0;
+
+    // Layout for input screen
+    int startY = 100;
+    int inputHeight = 40;
+    int inputWidth = 200;
+    int labelWidth = 250;
+    int padding = 15;
+    int fontSize = 20;
+
+    for (int i = 0; i < inputFieldCount; i++)
+    {
+        textBoxes[i] = {(float)screenWidth / 2 - inputWidth / 2, (float)startY + i * (inputHeight + padding), (float)inputWidth, (float)inputHeight};
+    }
+    startButton = {(float)screenWidth / 2 - inputWidth / 2, (float)startY + inputFieldCount * (inputHeight + padding) + 20, (float)inputWidth, (float)inputHeight + 10};
+
+    SetTargetFPS(60);
+    // --- 5. Main Game Loop (Placeholder) ---
+    while (!WindowShouldClose())
+    {
+        switch (currentState)
+        {
+        case STATE_INPUT:
+        {
+            framesCounter++;
+            if ((framesCounter / 30) % 2 == 0)
+                showCursor = true; // Blink cursor every half second
+            else
+                showCursor = false;
+
+            BeginDrawing();
+            ClearBackground(DARKGRAY);
+            DrawText("Power Grid Simulation Setup", screenWidth / 2 - MeasureText("Power Grid Simulation Setup", 30) / 2, 30, 30, WHITE);
+
+            DrawRectangleRec(startButton, MAROON);
+            DrawText("START SIMULATION", startButton.x + startButton.width / 2 - MeasureText("START SIMULATION", fontSize) / 2, startButton.y + (startButton.height - fontSize) / 2, fontSize, WHITE);
+
+            EndDrawing();
+        }
+        break;
+
+        case STATE_VISUALIZATION:
+        {
+            // --- Draw Scene ---
+            BeginDrawing();
+            ClearBackground(DARKGRAY);
+            EndDrawing();
+        }
+        break;
+        }
+    }
+
+    // --- 6. Cleanup ---
+    CloseWindow();
+
+    return 0;
+}
