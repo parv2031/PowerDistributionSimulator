@@ -281,22 +281,50 @@ int main()
         {
         case STATE_INPUT:
         {
+            // --- Update Input State ---
             framesCounter++;
             if ((framesCounter / 30) % 2 == 0)
                 showCursor = true; // Blink cursor every half second
             else
                 showCursor = false;
 
+            // (Input/Click logic will go here)
+
+            // --- Draw Input State ---
             BeginDrawing();
             ClearBackground(DARKGRAY);
             DrawText("Power Grid Simulation Setup", screenWidth / 2 - MeasureText("Power Grid Simulation Setup", 30) / 2, 30, 30, WHITE);
 
+            for (int i = 0; i < inputFieldCount; i++)
+            {
+                // Draw label
+                DrawText(labels[i], textBoxes[i].x - labelWidth, textBoxes[i].y + (inputHeight - fontSize) / 2.0f, fontSize, LIGHTGRAY);
+                // Draw text box rectangle
+                DrawRectangleRec(textBoxes[i], LIGHTGRAY);
+                if (activeTextBox == i)
+                    DrawRectangleLinesEx(textBoxes[i], 2, RED); // Highlight active box
+                else
+                    DrawRectangleLinesEx(textBoxes[i], 1, DARKGRAY);
+
+                // Draw text inside box
+                DrawText(inputStrings[i].c_str(), (int)(textBoxes[i].x + 5), (int)(textBoxes[i].y + (inputHeight - fontSize) / 2.0f), fontSize, BLACK);
+
+                // Draw blinking cursor
+                if (activeTextBox == i && showCursor)
+                {
+                    int textWidth = MeasureText(inputStrings[i].c_str(), fontSize);
+                    DrawRectangle((int)(textBoxes[i].x + 5 + textWidth), (int)(textBoxes[i].y + 4), 2, inputHeight - 8, MAROON);
+                }
+            }
+
+            // Draw Start Button
             DrawRectangleRec(startButton, MAROON);
             DrawText("START SIMULATION", startButton.x + startButton.width / 2 - MeasureText("START SIMULATION", fontSize) / 2, startButton.y + (startButton.height - fontSize) / 2, fontSize, WHITE);
 
             EndDrawing();
         }
         break;
+
 
         case STATE_VISUALIZATION:
         {
