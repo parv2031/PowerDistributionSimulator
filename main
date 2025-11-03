@@ -340,9 +340,47 @@ break;
             else
                 showCursor = false;
 
-            // (Input/Click logic will go here)
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+            {
+                activeTextBox = -1; // Deselect by default
+                for (int i = 0; i < inputFieldCount; i++)
+                {
+                    if (CheckCollisionPointRec(GetMousePosition(), textBoxes[i]))
+                    {
+                        activeTextBox = i;
+                        framesCounter = 0; // Reset cursor blink timer
+                        break;
+                    }
+                }
+            }
 
-            // --- Draw Input State ---
+            // Handle keyboard input if a text box is active
+            if (activeTextBox != -1)
+            {
+                int key = GetCharPressed();
+                while (key > 0)
+                {
+                    // Only allow digits
+                    if ((key >= '0' && key <= '9'))
+                    {
+                        if (inputStrings[activeTextBox].length() < 9)
+                        { // Limit length
+                            inputStrings[activeTextBox] += (char)key;
+                        }
+                    }
+                    key = GetCharPressed(); // Check next character in queue
+                }
+
+                if (IsKeyPressed(KEY_BACKSPACE))
+                {
+                    if (!inputStrings[activeTextBox].empty())
+                    {
+                        inputStrings[activeTextBox].pop_back();
+                    }
+                }
+            }
+
+            // --- Draw Input State (as implemented in Commit 14) ---
             BeginDrawing();
             ClearBackground(DARKGRAY);
             DrawText("Power Grid Simulation Setup", screenWidth / 2 - MeasureText("Power Grid Simulation Setup", 30) / 2, 30, 30, WHITE);
@@ -376,6 +414,7 @@ break;
             EndDrawing();
         }
         break;
+
 
 
         case STATE_VISUALIZATION:
