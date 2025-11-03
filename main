@@ -272,6 +272,58 @@ int main()
         textBoxes[i] = {(float)screenWidth / 2 - inputWidth / 2, (float)startY + i * (inputHeight + padding), (float)inputWidth, (float)inputHeight};
     }
     startButton = {(float)screenWidth / 2 - inputWidth / 2, (float)startY + inputFieldCount * (inputHeight + padding) + 20, (float)inputWidth, (float)inputHeight + 10};
+    // --- 4. Variables for STATE_VISUALIZATION ---
+graph G; // Create graph object
+Camera2D camera = {0};
+const float ZOOM_LOD_SUBSTATION = 0.5f;
+const float ZOOM_LOD_CONSUMER = 1.0f;
+graph::Vertix_A *selected_a_node = nullptr;
+graph::Vertix_B *selected_b_node = nullptr;
+graph::Edge *selected_edge = nullptr;
+unordered_set<void *> visited_nodes;
+vector<graph::Vertix_A *> a_nodes_to_draw;
+vector<graph::Vertix_B *> b_nodes_to_draw;
+
+// --- NEW: Variables for timed highlighting ---
+enum FixVizState
+{
+    VIZ_IDLE,
+    VIZ_SHOWING_OVERLOAD,
+    VIZ_SHOWING_FIX
+};
+FixVizState fix_viz_state = VIZ_IDLE;
+double fix_highlight_start_time = 0.0; // Time when overload highlight started
+// --- END NEW ---
+
+Code to Modify (to $\text{main}$ function): $\text{Replace the entire case STATE\_VISUALIZATION: block with this}$:
+C++
+case STATE_VISUALIZATION:
+{
+    // --- Update Camera ---
+    camera.zoom += ((float)GetMouseWheelMove() * 0.05f);
+    if (camera.zoom > 3.0f)
+        camera.zoom = 3.0f;
+    if (camera.zoom < 0.1f)
+        camera.zoom = 0.1f;
+
+    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+    {
+        Vector2 delta = GetMouseDelta();
+        delta = Vector2Scale(delta, -1.0f / camera.zoom);
+        camera.target = Vector2Add(camera.target, delta);
+    }
+
+    // --- Draw Scene ---
+    BeginDrawing();
+    ClearBackground(DARKGRAY);
+
+    BeginMode2D(camera);
+
+    EndMode2D();
+
+    EndDrawing();
+}
+break;
 
     SetTargetFPS(60);
     // --- 5. Main Game Loop (Placeholder) ---
