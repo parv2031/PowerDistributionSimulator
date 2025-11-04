@@ -295,36 +295,6 @@ FixVizState fix_viz_state = VIZ_IDLE;
 double fix_highlight_start_time = 0.0; // Time when overload highlight started
 // --- END NEW ---
 
-Code to Modify (to $\text{main}$ function): $\text{Replace the entire case STATE\_VISUALIZATION: block with this}$:
-C++
-case STATE_VISUALIZATION:
-{
-    // --- Update Camera ---
-    camera.zoom += ((float)GetMouseWheelMove() * 0.05f);
-    if (camera.zoom > 3.0f)
-        camera.zoom = 3.0f;
-    if (camera.zoom < 0.1f)
-        camera.zoom = 0.1f;
-
-    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT))
-    {
-        Vector2 delta = GetMouseDelta();
-        delta = Vector2Scale(delta, -1.0f / camera.zoom);
-        camera.target = Vector2Add(camera.target, delta);
-    }
-
-    // --- Draw Scene ---
-    BeginDrawing();
-    ClearBackground(DARKGRAY);
-
-    BeginMode2D(camera);
-
-    EndMode2D();
-
-    EndDrawing();
-}
-break;
-
     SetTargetFPS(60);
     // --- 5. Main Game Loop (Placeholder) ---
     while (!WindowShouldClose())
@@ -415,16 +385,33 @@ break;
         }
         break;
 
-
-
         case STATE_VISUALIZATION:
-        {
-            // --- Draw Scene ---
-            BeginDrawing();
-            ClearBackground(DARKGRAY);
-            EndDrawing();
-        }
-        break;
+{
+    // --- Update Camera ---
+    camera.zoom += ((float)GetMouseWheelMove() * 0.05f);
+    if (camera.zoom > 3.0f)
+        camera.zoom = 3.0f;
+    if (camera.zoom < 0.1f)
+        camera.zoom = 0.1f;
+
+    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+    {
+        Vector2 delta = GetMouseDelta();
+        delta = Vector2Scale(delta, -1.0f / camera.zoom);
+        camera.target = Vector2Add(camera.target, delta);
+    }
+
+    // --- Draw Scene ---
+    BeginDrawing();
+    ClearBackground(DARKGRAY);
+
+    BeginMode2D(camera);
+
+    EndMode2D();
+
+    EndDrawing();
+}
+break;
         }
     }
 
