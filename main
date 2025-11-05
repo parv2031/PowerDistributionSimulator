@@ -214,6 +214,43 @@ public:
         }
     }
 };
+void DrawNodeA(graph::Vertix_A *node)
+{
+    if (node->node_type == "power_plant")
+    {
+        DrawCircle(node->x, node->y, 15.0f, PINK);
+        DrawCircleLines(node->x, node->y, 15.0f, MAROON);
+    }
+    else if (node->node_type == "substation")
+    {
+        DrawCircle(node->x, node->y, 10.0f, BLUE);
+        DrawCircleLines(node->x, node->y, 10.0f, DARKBLUE);
+    }
+}
+void DrawNodeB(graph::Vertix_B *node)
+{
+    float radius = 5.0f;
+    Color color = BROWN; // Default for residential
+
+    if (node->node_type == "hospital")
+    {
+        color = DARKBLUE;
+        radius = 7.0f;
+    }
+    else if (node->node_type == "industrial")
+    {
+        color = ORANGE;
+        radius = 7.0f;
+    }
+    else if (node->node_type == "institute")
+    {
+        color = PURPLE;
+        radius = 7.0f;
+    }
+
+    DrawCircle(node->x, node->y, radius, color);
+}
+
 
 // --- NEW: Define Game States ---
 enum GameState
@@ -489,6 +526,61 @@ double fix_highlight_start_time = 0.0; // Time when overload highlight started
     }
 
     EndMode2D();
+// --- Draw UI (Overlay) ---
+        DrawText("Power Grid Visualizer", 10, 10, 20, WHITE);
+        DrawText("Power Plant  ", 10, 35, 18, WHITE);
+        DrawCircle(165, 44, 7.0f, PINK);
+        DrawText("Substation   ", 10, 55, 18, WHITE);
+        DrawCircle(165, 64, 7.0f, BLUE);
+        DrawText("Resident     ", 10, 75, 18, WHITE);
+        DrawCircle(165, 84, 7.0f, BROWN);
+        DrawText("Hospital     ", 10, 95, 18, WHITE);
+        DrawCircle(165, 104, 7.0f, DARKBLUE);
+        DrawText("Institute    ", 10, 115, 18, WHITE);
+        DrawCircle(165, 124, 7.0f, PURPLE);
+        DrawText("Industry     ", 10, 135, 18, WHITE);
+        DrawCircle(165, 144, 7.0f, ORANGE);
+        DrawFPS(screenWidth - 100, 10);
+        DrawRectangle(screenWidth - 255, 5, 250, 130, Fade(BLACK, 0.7f));
+        DrawText("[I] Increase Random Demand", screenWidth - 250, 10, 18, WHITE);
+        DrawText("[O] Fix Edge/Throttle Node", screenWidth - 250, 35, 18, WHITE);
+        DrawText("[U] Upgrade Selected Node", screenWidth - 250, 60, 18, WHITE);
+        DrawText("[C] Clear Highlights", screenWidth - 250, 85, 18, WHITE);
+        DrawText("[BACKSPACE] Main Menu", screenWidth - 250, 110, 18, WHITE);
+        // --- Draw Inspector Panel ---
+        if (selected_a_node != nullptr)
+        {
+                // --- Show the normal panel ---
+                string type = "Type: " + selected_a_node->node_type;
+                string load = "Current Load: " + to_string(selected_a_node->current_downstream_demand);
+                string limit = "Max Limit: " + to_string(selected_a_node->max_limit);
+
+                DrawRectangle(10, 170, 250, 80, Fade(BLACK, 0.7f));
+                DrawText("--- SELECTED NODE ---", 15, 175, 16, YELLOW);
+                DrawText(type.c_str(), 15, 195, 18, WHITE);
+                DrawText(load.c_str(), 15, 215, 18, WHITE);
+                DrawText(limit.c_str(), 15, 235, 18, WHITE);
+        }
+        else if (selected_b_node != nullptr)
+        {
+            string type = "Type: " + selected_b_node->node_type;
+            string demand = "Demand: " + to_string(selected_b_node->demand);
+
+            DrawRectangle(10, 170, 250, 60, Fade(BLACK, 0.7f));
+            DrawText("--- SELECTED NODE ---", 15, 175, 16, YELLOW);
+            DrawText(type.c_str(), 15, 195, 18, WHITE);
+            DrawText(demand.c_str(), 15, 215, 18, WHITE);
+        }
+        else if (selected_edge != nullptr)
+        {
+            string load = "Current Load: " + to_string(selected_edge->current_load);
+            string max_load_str = "Max Load: " + to_string(selected_edge->max_load);
+
+            DrawRectangle(10, 170, 250, 60, Fade(BLACK, 0.7f));
+            DrawText("--- SELECTED EDGE ---", 15, 175, 16, YELLOW);
+            DrawText(load.c_str(), 15, 195, 18, WHITE);
+            DrawText(max_load_str.c_str(), 15, 215, 18, WHITE);
+        }
 
     EndDrawing();
 }
