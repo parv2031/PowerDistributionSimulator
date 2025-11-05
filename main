@@ -405,7 +405,88 @@ double fix_highlight_start_time = 0.0; // Time when overload highlight started
     BeginDrawing();
     ClearBackground(DARKGRAY);
 
-    BeginMode2D(camera);
+     BeginMode2D(camera);
+
+    // --- Draw Edges (A -> A) ---
+    for (auto const &map_entry : G.adj_power_substation)
+    {
+        graph::Vertix_A *parent = map_entry.first;
+        for (auto &edge_pair : map_entry.second)
+        {
+            graph::Vertix_A *child = edge_pair.first;
+            graph::Edge *edge = edge_pair.second;
+
+            Color edgeColor = GRAY;
+            float thickness = 1.0f;
+            bool drawEdge = false;
+
+            // Determine Base Color
+            if (parent->node_type == "power_plant")
+                edgeColor = YELLOW;
+            else if (parent->node_type == "substation")
+                edgeColor = SKYBLUE;
+
+            // Check Zoom Level
+            if (camera.zoom >= ZOOM_LOD_SUBSTATION)
+                drawEdge = true;
+
+            if (drawEdge)
+            {
+                // Get start/end vectors and child radius for the arrow
+                Vector2 startV = {(float)parent->x, (float)parent->y};
+                Vector2 endV = {(float)child->x, (float)child->y};
+                float endRadius = (child->node_type == "power_plant") ? 15.0f : 10.0f;
+
+                // --- Draw normal edges as simple LINES ---
+                DrawLineEx(startV, endV, thickness / camera.zoom, edgeColor);
+            } // End if(drawEdge)
+        } // End edge loop
+    } // End A->A map loop
+
+    // --- Draw Edges (A -> B) ---
+    for (auto const &map_entry : G.adj_substion_consumer)
+    {
+        graph::Vertix_A *parent = map_entry.first;
+        for (auto &edge_pair : map_entry.second)
+        {
+            graph::Vertix_B *child = edge_pair.first;
+            graph::Edge *edge = edge_pair.second;
+
+            if (camera.zoom >= ZOOM_LOD_CONSUMER)
+            {
+                Vector2 startV = {(float)parent->x, (float)parent->y};
+                Vector2 endV = {(float)child->x, (float)child->y};
+
+                // Determine child radius
+                float endRadius = 5.0f;
+                if (child->node_type != "residential")
+                    endRadius = 7.0f;
+
+                DrawLineEx(startV, endV, 1.0f / camera.zoom, LIGHTGRAY);
+            }
+        }
+    }
+    // --- Draw Nodes (on top of edges) ---
+    for (graph::Vertix_A *node : a_nodes_to_draw)
+    {
+        if (node->node_type == "power_plant")
+        {
+            DrawNodeA(node);
+        }
+        else if (node->node_type == "substation" && camera.zoom >= ZOOM_LOD_SUBSTATION)
+        {
+            DrawNodeA(node); // Draw blue circle
+        }
+    }
+
+    if (camera.zoom >= ZOOM_LOD_CONSUMER)
+    {
+        for (graph::Vertix_B *node : b_nodes_to_draw)
+        {
+            DrawNodeB(node);
+            float radius = (node->node_type == "residential") ? 5.0f : 7.0f;
+        }
+    }
 
     EndMode2D();
 
