@@ -338,7 +338,7 @@ double fix_highlight_start_time = 0.0; // Time when overload highlight started
     {
         switch (currentState)
         {
-        case STATE_INPUT:
+         case STATE_INPUT:
         {
             // --- Update Input State ---
             framesCounter++;
@@ -387,7 +387,64 @@ double fix_highlight_start_time = 0.0; // Time when overload highlight started
                 }
             }
 
-            // --- Draw Input State (as implemented in Commit 14) ---
+            // Check Start Button Click
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), startButton))
+            {
+                try
+                {
+                    // --- 1. Parse all inputs (use stoi, catch exceptions) ---
+                    int num_power_plant = std::stoi(inputStrings[0]);
+                    int num_substation = std::stoi(inputStrings[1]);
+                    int num_consumer = std::stoi(inputStrings[2]);
+                    resident_demand = std::stoi(inputStrings[3]);
+                    hospital_demand = std::stoi(inputStrings[4]);
+                    industry_demand = std::stoi(inputStrings[5]);
+                    institute_demand = std::stoi(inputStrings[6]);
+
+                    // --- Basic Input Validation ---
+                    if (num_power_plant <= 0 || num_substation < 0 || num_consumer <= 0 ||
+                        resident_demand <= 0 || hospital_demand <= 0 || industry_demand <= 0 || institute_demand <= 0)
+                    {
+                        cout << "Error: All inputs must be positive integers (substations can be 0)." << endl;
+                        // Optionally show an error message on screen
+                    }
+                    else
+                    {
+                        // --- 2. Build and Layout Graph ---
+                        cout << "Building graph...\n";
+                        G.mapping(num_power_plant, num_substation, num_consumer);
+                        cout << "Network successfully built.\n";
+
+                        G.layout_graph();
+                        cout << "Graph layout calculated.\n";
+
+                        // G.add_realistic_connections(2); // This will be added later
+                        cout << "Realistic redundant connections added.\n";
+
+                        // --- 3. Setup Visualization Camera ---
+                        camera.target = (Vector2){1000, 1000};
+                        camera.offset = (Vector2){screenWidth / 2.0f, screenHeight / 2.0f};
+                        camera.rotation = 0.0f;
+                        camera.zoom = 0.25f;
+
+                        // --- 4. Switch State ---
+                        currentState = STATE_VISUALIZATION;
+                        cout << "Starting visualization...\n";
+                    }
+                }
+                catch (const std::invalid_argument &e)
+                {
+                    cout << "Error: Invalid input. Please enter numbers only." << endl;
+                    // Optionally show an error message on screen
+                }
+                catch (const std::out_of_range &e)
+                {
+                    cout << "Error: Input number is too large." << endl;
+                    // Optionally show an error message on screen
+                }
+            }
+
+            // --- Draw Input State ---
             BeginDrawing();
             ClearBackground(DARKGRAY);
             DrawText("Power Grid Simulation Setup", screenWidth / 2 - MeasureText("Power Grid Simulation Setup", 30) / 2, 30, 30, WHITE);
@@ -421,6 +478,7 @@ double fix_highlight_start_time = 0.0; // Time when overload highlight started
             EndDrawing();
         }
         break;
+
 
         case STATE_VISUALIZATION:
 {
