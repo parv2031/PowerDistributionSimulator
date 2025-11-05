@@ -482,106 +482,185 @@ double fix_highlight_start_time = 0.0; // Time when overload highlight started
 
         case STATE_VISUALIZATION:
 {
-    // --- Update Camera ---
-    camera.zoom += ((float)GetMouseWheelMove() * 0.05f);
-    if (camera.zoom > 3.0f)
-        camera.zoom = 3.0f;
-    if (camera.zoom < 0.1f)
-        camera.zoom = 0.1f;
 
-    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT))
-    {
-        Vector2 delta = GetMouseDelta();
-        delta = Vector2Scale(delta, -1.0f / camera.zoom);
-        camera.target = Vector2Add(camera.target, delta);
-    }
+       // --- Pre-populate node lists for update and draw phases ---
+        visited_nodes.clear();
+        a_nodes_to_draw.clear();
+        b_nodes_to_draw.clear();
 
-    // --- Draw Scene ---
-    BeginDrawing();
-    ClearBackground(DARKGRAY);
-
-     BeginMode2D(camera);
-
-    // --- Draw Edges (A -> A) ---
-    for (auto const &map_entry : G.adj_power_substation)
-    {
-        graph::Vertix_A *parent = map_entry.first;
-        for (auto &edge_pair : map_entry.second)
+        for (auto const &map_entry : G.adj_power_substation)
         {
-            graph::Vertix_A *child = edge_pair.first;
-            graph::Edge *edge = edge_pair.second;
-
-            Color edgeColor = GRAY;
-            float thickness = 1.0f;
-            bool drawEdge = false;
-
-            // Determine Base Color
-            if (parent->node_type == "power_plant")
-                edgeColor = YELLOW;
-            else if (parent->node_type == "substation")
-                edgeColor = SKYBLUE;
-
-            // Check Zoom Level
-            if (camera.zoom >= ZOOM_LOD_SUBSTATION)
-                drawEdge = true;
-
-            if (drawEdge)
+            graph::Vertix_A *parent = map_entry.first;
+            if (visited_nodes.find(parent) == visited_nodes.end())
             {
-                // Get start/end vectors and child radius for the arrow
-                Vector2 startV = {(float)parent->x, (float)parent->y};
-                Vector2 endV = {(float)child->x, (float)child->y};
-                float endRadius = (child->node_type == "power_plant") ? 15.0f : 10.0f;
-
-                // --- Draw normal edges as simple LINES ---
-                DrawLineEx(startV, endV, thickness / camera.zoom, edgeColor);
-            } // End if(drawEdge)
-        } // End edge loop
-    } // End A->A map loop
-
-    // --- Draw Edges (A -> B) ---
-    for (auto const &map_entry : G.adj_substion_consumer)
-    {
-        graph::Vertix_A *parent = map_entry.first;
-        for (auto &edge_pair : map_entry.second)
-        {
-            graph::Vertix_B *child = edge_pair.first;
-            graph::Edge *edge = edge_pair.second;
-
-            if (camera.zoom >= ZOOM_LOD_CONSUMER)
+                a_nodes_to_draw.push_back(parent);
+                visited_nodes.insert(parent);
+            }
+            for (auto &edge_pair : map_entry.second)
             {
-                Vector2 startV = {(float)parent->x, (float)parent->y};
-                Vector2 endV = {(float)child->x, (float)child->y};
-
-                // Determine child radius
-                float endRadius = 5.0f;
-                if (child->node_type != "residential")
-                    endRadius = 7.0f;
-
-                DrawLineEx(startV, endV, 1.0f / camera.zoom, LIGHTGRAY);
+                graph::Vertix_A *child = edge_pair.first;
+                if (visited_nodes.find(child) == visited_nodes.end())
+                {
+                    a_nodes_to_draw.push_back(child);
+                    visited_nodes.insert(child);
+                }
             }
         }
-    }
-    // --- Draw Nodes (on top of edges) ---
-    for (graph::Vertix_A *node : a_nodes_to_draw)
-    {
-        if (node->node_type == "power_plant")
+        for (auto const &map_entry : G.adj_substion_consumer)
         {
-            DrawNodeA(node);
+            graph::Vertix_A *parent = map_entry.first;
+            if (visited_nodes.find(parent) == visited_nodes.end())
+            {
+                a_nodes_to_draw.push_back(parent);
+                visited_nodes.insert(parent);
+            }
+            for (auto &edge_pair : map_entry.second)
+            {
+                graph::Vertix_B *child = edge_pair.first;
+                if (visited_nodes.find(child) == visited_nodes.end())
+                {
+                    b_nodes_to_draw.push_back(child);
+                    visited_nodes.insert(child);
+                }
+            }
         }
-        else if (node->node_type == "substation" && camera.zoom >= ZOOM_LOD_SUBSTATION)
-        {
-            DrawNodeA(node); // Draw blue circle
-        }
-    }
 
-    if (camera.zoom >= ZOOM_LOD_CONSUMER)
-    {
-        for (graph::Vertix_B *node : b_nodes_to_draw)
+    // --- Update Camera ---
+     if (IsMouseButtonDown(MOUSE_BUTTON_LEFT))
         {
-            DrawNodeB(node);
-            float radius = (node->node_type == "residential") ? 5.0f : 7.0f;
+            Vector2 delta = GetMouseDelta();
+            delta = Vector2Scale(delta, -1.0f / camera.zoom);
+            camera.target = Vector2Add(camera.target, delta);
         }
-    }
+
+        // --- Update selection state ---
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+        {
+            Vector2 worldMousePos = GetScreenToWorld2D(GetMousePosition(), camera);
+
+            selected_a_node = nullptr;
+            selected_b_node = nullptr;
+            selected_edge = nullptr;
+
+            bool foundClick = false;
+
+            // Check B-Nodes
+            if (camera.zoom >= ZOOM_LOD_CONSUMER)
+            {
+                for (auto *node : b_nodes_to_draw)
+                {
+                    float radius = 5.0f;
+                    if (node->node_type == "hospital" || node->node_type == "industrial" || node->node_type == "institute")
+                        radius = 7.0f;
+
+                    if (CheckCollisionPointCircle(worldMousePos, {(float)node->x, (float)node->y}, radius))
+                    {
+                        selected_b_node = node;
+                        foundClick = true;
+                        break;
+                    }
+                }
+            }
+
+            // Check A-Nodes
+            if (!foundClick)
+            {
+                for (auto *node : a_nodes_to_draw)
+                {
+                    float radius = 0.0f;
+                    if (node->node_type == "power_plant")
+                    {
+                        radius = 15.0f;
+                    }
+                     if (node == selected_a_node)
+            DrawCircleLines(node->x, node->y, 17.0f, YELLOW);
+
+
+                    else if (node->node_type == "substation" && camera.zoom >= ZOOM_LOD_SUBSTATION)
+                    {
+                        radius = 10.0f;
+                    }
+
+                    if (radius > 0.0f && CheckCollisionPointCircle(worldMousePos, {(float)node->x, (float)node->y}, radius))
+                    {
+                        selected_a_node = node;
+                        foundClick = true;
+                        break;
+                    }
+                }
+            }
+
+            const int lineClickThreshold = 5;
+
+            // Check Edges (A -> A)
+            if (!foundClick)
+            {
+                
+                if (camera.zoom >= ZOOM_LOD_SUBSTATION)
+                {
+                    for (auto const &map_entry : G.adj_power_substation)
+                    {
+                        graph::Vertix_A *parent = map_entry.first;
+                        for (auto &edge_pair : map_entry.second)
+                        {
+                            graph::Vertix_A *child = edge_pair.first;
+                            graph::Edge *edge = edge_pair.second;
+
+                            if (CheckCollisionPointLine(worldMousePos,
+                                                        {(float)parent->x, (float)parent->y},
+                                                        {(float)child->x, (float)child->y},
+                                                        lineClickThreshold / camera.zoom))
+                            {
+                                selected_edge = edge;
+                                foundClick = true;
+                                break;
+                            }
+                        }
+                        // Draw Selection Highlight (Yellow Outline) on top
+            if (edge == selected_edge)
+            {
+                DrawLineEx(startV, endV, (thickness + 2.0f) / camera.zoom, YELLOW);
+            }
+
+                        if (foundClick)
+                            break;
+                    }
+                }
+            }
+
+            // Check Edges (A -> B)
+            if (!foundClick)
+            {
+                if (edge == selected_edge)
+            {
+                DrawLineEx(startV, endV, 4.0f / camera.zoom, YELLOW);
+
+                if (camera.zoom >= ZOOM_LOD_CONSUMER)
+                {
+                    for (auto const &map_entry : G.adj_substion_consumer)
+                    {
+                        graph::Vertix_A *parent = map_entry.first;
+                        for (auto &edge_pair : map_entry.second)
+                        {
+                            graph::Vertix_B *child = edge_pair.first;
+                            graph::Edge *edge = edge_pair.second;
+
+                            if (CheckCollisionPointLine(worldMousePos,
+                                                        {(float)parent->x, (float)parent->y},
+                                                        {(float)child->x, (float)child->y},
+                                                        lineClickThreshold / camera.zoom))
+                            {
+                                selected_edge = edge;
+                                foundClick = true;
+                                break;
+                            }
+                        }
+                        if (foundClick)
+                            break;
+                    }
+                }
+            }
+        }
 
     EndMode2D();
 // --- Draw UI (Overlay) ---
