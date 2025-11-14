@@ -245,6 +245,10 @@ public:
         }
     }
 private:   
+    double GetDistance(int x1, int y1, int x2, int y2)
+    {
+        return sqrt(pow(static_cast<double>(x1 - x2), 2) + pow(static_cast<double>(y1 - y2), 2));
+    }
     int GetRandom(int min_val, int max_val)
     {
         if (min_val > max_val)
