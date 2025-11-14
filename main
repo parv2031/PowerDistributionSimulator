@@ -1283,5 +1283,71 @@ public:
             cout << "Upgrade: Selected node is not overloaded." << endl;
         }
     }
-
 } ;
+
+// --- RAYLIB HELPER FUNCTIONS --- 
+void DrawNodeA(graph::Vertex_A *node)
+{
+    if (node->node_type == "power_plant")
+    {
+        DrawCircle(node->x, node->y, 15.0f, PINK);
+        DrawCircleLines(node->x, node->y, 15.0f, MAROON);
+    }
+    else if (node->node_type == "substation")
+    {
+        DrawCircle(node->x, node->y, 10.0f, BLUE);
+        DrawCircleLines(node->x, node->y, 10.0f, DARKBLUE);
+    }
+}
+void DrawNodeB(graph::Vertex_B *node)
+{
+    float radius = 5.0f;
+    Color color = BROWN; // Default for residential
+
+    if (node->node_type == "hospital")
+    {
+        color = DARKBLUE;
+        radius = 7.0f;
+    }
+    else if (node->node_type == "industrial")
+    {
+        color = ORANGE;
+        radius = 7.0f;
+    }
+    else if (node->node_type == "institute")
+    {
+        color = PURPLE;
+        radius = 7.0f;
+    }
+
+    DrawCircle(node->x, node->y, radius, color);
+}
+void DrawArrow(Vector2 start, Vector2 end, float endRadius, float thickness, Color color)
+{
+    // 1. Calculate direction and the point where the arrow should stop
+    Vector2 dir = Vector2Normalize(Vector2Subtract(end, start));
+    Vector2 arrowPoint = Vector2Subtract(end, Vector2Scale(dir, endRadius));
+
+    // 2. Draw the main line
+    DrawLineEx(start, arrowPoint, thickness, color);
+
+    // 3. Calculate the two "wings" of the arrowhead
+    float arrowSize = 8.0f; // Size of the arrowhead wings
+    Vector2 leftWingDir = Vector2Rotate(dir, -150 * DEG2RAD);
+    Vector2 rightWingDir = Vector2Rotate(dir, 150 * DEG2RAD);
+
+    Vector2 leftWingEnd = Vector2Add(arrowPoint, Vector2Scale(leftWingDir, arrowSize / (thickness > 2.0f ? 1.5f : 1.0f)));
+    Vector2 rightWingEnd = Vector2Add(arrowPoint, Vector2Scale(rightWingDir, arrowSize / (thickness > 2.0f ? 1.5f : 1.0f)));
+
+    // 4. Draw the wings
+    DrawLineEx(arrowPoint, leftWingEnd, thickness, color);
+    DrawLineEx(arrowPoint, rightWingEnd, thickness, color);
+}
+// --- Define Game States ---
+enum GameState
+{
+    STATE_INPUT,
+    STATE_VISUALIZATION
+};
+
+
