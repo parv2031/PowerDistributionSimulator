@@ -7,3 +7,41 @@
 #include "raymath.h"
 
 using namespace std;
+class graph{
+public:
+    class Vertex_A
+    { // power_plant and substation Vertex
+    public:
+        string node_type = "";
+        float max_limit;
+        float current_downstream_demand; // Tracks actual load
+        int x, y;                        // <-- Coordinates
+
+        // constructor
+        Vertex_A(string type) : node_type(type), max_limit(0), current_downstream_demand(0), x(0), y(0)
+        {
+        }
+    };
+
+    class Vertex_B
+    { // consumer Vertex
+    public:
+        int demand;
+        string node_type; 
+        int x, y;         // <-- Coordinates
+
+        // constructor
+        Vertex_B(string type) : node_type(type), x(0), y(0)
+        {
+            if (type == "residential")
+                demand = resident_demand;
+            else if (type == "industrial")
+                demand = industry_demand;
+            else if (type == "institute")
+                demand = institute_demand;
+            else
+                demand = hospital_demand;
+        }
+    };
+
+} ;
