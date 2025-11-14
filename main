@@ -126,4 +126,33 @@ public:
         map_powerplants_to_substations(powerplants, substations);
     }
 
+
+    void substation_consumer_connector(Vertex_A *substation, int value)
+    {
+        int hospital_count = 0.2f * value;
+        int industrial_count = 0.1f * value;
+        int institute_count = 0.2f * value;
+        int resident_count = value - (hospital_count + industrial_count + institute_count);
+        int total_demand = 0;
+        vector<pair<Vertex_B *, Edge *>> connect;
+        auto add_consumer = [&](const string &type, int count)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                Vertex_B *node = new Vertex_B(type);
+                total_demand += node->demand;
+                Edge *edge = new Edge(substation, node); // Constructor sets loads
+                connect.push_back({node, edge});
+            }
+        };
+        add_consumer("hospital", hospital_count);
+        add_consumer("industrial", industrial_count);
+        add_consumer("institute", institute_count);
+        add_consumer("residential", resident_count);
+
+        substation->max_limit = total_demand * 1.5f;          // Node's max capacity (150% of demand)
+        substation->current_downstream_demand = total_demand; // Node's current load
+
+        adj_substion_consumer[substation] = connect;
+    }
 } ;
