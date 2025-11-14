@@ -285,6 +285,31 @@ private:
         }
         return true;
     }
+    bool is_position_ok_B(Vertex_B *node_to_place, int x, int y,const unordered_map<GridKey, vector<Vertex_B *>, PairHash> &grid,int CELL_SIZE)
+    {
+        const float min_dist = 5.0f;
+        int grid_x = x / CELL_SIZE;
+        int grid_y = y / CELL_SIZE;
+
+        for (int dx = -1; dx <= 1; ++dx)
+        {
+            for (int dy = -1; dy <= 1; ++dy)
+            {
+                GridKey key = {grid_x + dx, grid_y + dy};
+                if (grid.count(key))
+                {
+                    for (auto *other_node : grid.at(key))
+                    {
+                        if (GetDistance(x, y, other_node->x, other_node->y) < min_dist)
+                        {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+        return true;
+    }
 
 public:
     vector<pair<string, pair<int, int>>> layout_graph()
