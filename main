@@ -571,5 +571,61 @@ public:
             }
         }
     }
+    Vertex_B *increase_random_consumer_demand()
+    {
+        int total_consumers = 0;
+        for (auto const &[substation, consumer_list] : adj_substion_consumer)
+        {
+            total_consumers += consumer_list.size();
+        }
+
+        if (total_consumers == 0)
+        {
+            cout << "Event: No consumers found to increase demand." << endl;
+            return nullptr;
+        }
+
+        int random_index = rand() % total_consumers;
+
+        for (auto const &[substation, consumer_list] : adj_substion_consumer)
+        {
+            if (random_index < consumer_list.size())
+            {
+                auto &[consumer_node, consumer_edge] = consumer_list[random_index];
+
+                // 1. Calculate proposed increase
+                float increase = std::max(5.0f, consumer_node->demand * 0.2f);
+
+
+                if (consumer_edge->current_load + increase > consumer_edge->max_load)
+                {
+                    cout << "--- Random Event FAILED ---" << endl;
+                    cout << "  Consumer: " << consumer_node->node_type << " (" << consumer_node << ")" << endl;
+                    cout << "  Reason: Local consumer line is at max capacity." << endl;
+                    return nullptr; // Stop here
+                }
+
+                // All other checks are removed. Apply the change.
+                consumer_node->demand += increase;
+                consumer_edge->current_load += increase;
+
+                // 3. Propagate this increase up the network
+                unordered_set<Vertex_A *> visited_propagation;
+                propagate_demand_change(substation, increase, visited_propagation);
+
+                cout << "--- Random Event ---" << endl;
+                cout << "Increased demand for " << consumer_node->node_type
+                     << " (" << consumer_node << ")" << endl;
+                cout << "  By: " << increase << " kW. New Total: " << consumer_node->demand << " kW." << endl;
+                cout << "  Parent Substation: " << substation << endl;
+
+                this->last_demand_increase_consumer = consumer_node;
+                return consumer_node;
+            }
+
+            random_index -= consumer_list.size();
+        }
+        return nullptr;
+    }
 
 } ;
