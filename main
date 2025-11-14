@@ -244,6 +244,43 @@ public:
             plant->current_downstream_demand = sum_substation_demands;
         }
     }
+private:   
+    int GetRandom(int min_val, int max_val)
+    {
+        if (min_val > max_val)
+            std::swap(min_val, max_val);
+        return (rand() % (max_val - min_val + 1)) + min_val;
+    }
+    using GridKey = pair<int, int>;
+
+    bool is_position_ok_A(Vertex_A *node_to_place, int x, int y,const unordered_map<GridKey, vector<Vertex_A *>, PairHash> &grid,int CELL_SIZE)
+    {
+        float min_dist = (node_to_place->node_type == "power_plant") ? 400.0f : 50.0f;
+        int grid_x = x / CELL_SIZE;
+        int grid_y = y / CELL_SIZE;
+
+        for (int dx = -1; dx <= 1; ++dx)
+        {
+            for (int dy = -1; dy <= 1; ++dy)
+            {
+                GridKey key = {grid_x + dx, grid_y + dy};
+                if (grid.count(key))
+                {
+                    for (auto *other_node : grid.at(key))
+                    {
+                        if (other_node->node_type == node_to_place->node_type)
+                        {
+                            if (GetDistance(x, y, other_node->x, other_node->y) < min_dist)
+                            {
+                                return false;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return true;
+    }
 
 public:
     vector<pair<string, pair<int, int>>> layout_graph()
