@@ -1350,4 +1350,80 @@ enum GameState
     STATE_VISUALIZATION
 };
 
+int main(){
+
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+    srand((unsigned int)time(0)); // Seed random number generator
+
+    // --- 1. Initialize Raylib Window ---
+    const int screenWidth = 1280;
+    const int screenHeight = 720;
+    InitWindow(screenWidth, screenHeight, "Power Grid Visualizer");
+
+    // --- 2. Define States ---
+    GameState currentState = STATE_INPUT;
+
+    // --- 3. Variables for STATE_INPUT (Using basic Raylib) ---
+    const int inputFieldCount = 7;
+    const char *labels[inputFieldCount] = {
+        "Power Plants:", "Substations:", "Consumers:",
+        "Resident Demand:", "Hospital Demand:", "Industrial Demand:", "Institute Demand:"};
+    Rectangle textBoxes[inputFieldCount];
+    std::string inputStrings[inputFieldCount]; 
+    int activeTextBox = -1;                    // Index of the currently selected text box, -1 for none
+
+    // Set default values for the strings
+    inputStrings[0] = "3";
+    inputStrings[1] = "18";
+    inputStrings[2] = "100"; // scaled by 1/9
+    inputStrings[3] = "10";
+    inputStrings[4] = "100";
+    inputStrings[5] = "500";
+    inputStrings[6] = "80";
+
+    Rectangle startButton;
+    bool showCursor = false;
+    int framesCounter = 0;
+
+    // Layout for input screen
+    int startY = 100;
+    int inputHeight = 40;
+    int inputWidth = 200;
+    int labelWidth = 250;
+    int padding = 15;
+    int fontSize = 20;
+
+    for (int i = 0; i < inputFieldCount; i++)
+    {
+        textBoxes[i] = {(float)screenWidth / 2 - inputWidth / 2, (float)startY + i * (inputHeight + padding), (float)inputWidth, (float)inputHeight};
+    }
+    startButton = {(float)screenWidth / 2 - inputWidth / 2, (float)startY + inputFieldCount * (inputHeight + padding) + 20, (float)inputWidth, (float)inputHeight + 10};
+
+    // --- 4. Variables for STATE_VISUALIZATION ---
+    graph G; // Create graph object
+    Camera2D camera = {0};
+    const float ZOOM_LOD_SUBSTATION = 0.5f;
+    const float ZOOM_LOD_CONSUMER = 1.0f;
+    graph::Vertex_A *selected_a_node = nullptr;
+    graph::Vertex_B *selected_b_node = nullptr;
+    graph::Edge *selected_edge = nullptr;
+    unordered_set<void *> visited_nodes;
+    vector<graph::Vertex_A *> a_nodes_to_draw;
+    vector<graph::Vertex_B *> b_nodes_to_draw;
+
+    // ---  Variables for timed highlighting ---
+    enum FixVizState
+    {
+        VIZ_IDLE,
+        VIZ_SHOWING_OVERLOAD,
+        VIZ_SHOWING_FIX
+    };
+    FixVizState fix_viz_state = VIZ_IDLE;
+    double fix_highlight_start_time = 0.0; // Time when overload highlight started
+    // --- END NEW ---
+
+    SetTargetFPS(60);
+
+}
 
