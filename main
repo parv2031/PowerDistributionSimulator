@@ -1812,9 +1812,287 @@ int main(){
                         }
                     }
                 }
+                if (fix_viz_state == VIZ_SHOWING_OVERLOAD && (GetTime() - fix_highlight_start_time >= 0.5))
+                {
+                    fix_viz_state = VIZ_SHOWING_FIX; // Switch to showing the fix path after 0.5 seconds
+                    cout << "Switching to fix path visualization." << endl;
+                }
+            }
 
+            // --- Draw Scene ---
+            BeginDrawing();
+            ClearBackground(DARKGRAY);
 
-        
+            BeginMode2D(camera);
+
+            // --- Draw Edges (A -> A) ---
+            unordered_set<graph::Edge *> path_edges_for_fix_viz;
+            if (fix_viz_state == VIZ_SHOWING_FIX)
+            {
+                for (size_t i = 1; i < G.fix_path.size(); ++i)
+                {
+                    if (G.fix_path[i].second)
+                    {
+                        path_edges_for_fix_viz.insert(G.fix_path[i].second);
+                    }
+                }
+            }
+
+            for (auto const &map_entry : G.adj_power_substation)
+            {
+                graph::Vertex_A *parent = map_entry.first;
+                for (auto &edge_pair : map_entry.second)
+                {
+                    graph::Vertex_A *child = edge_pair.first;
+                    graph::Edge *edge = edge_pair.second;
+
+                    Color edgeColor = GRAY;
+                    float thickness = 1.0f;
+                    bool drawEdge = false;
+
+                    // Determine Base Color
+                    if (parent->node_type == "power_plant")
+                        edgeColor = YELLOW;
+                    else if (parent->node_type == "substation")
+                        edgeColor = SKYBLUE;
+
+                    // Check Zoom Level
+                    if (camera.zoom >= ZOOM_LOD_SUBSTATION)
+                        drawEdge = true;
+
+                    if (drawEdge)
+                    {
+                        // Get start/end vectors and child radius for the arrow
+                        Vector2 startV = {(float)parent->x, (float)parent->y};
+                        Vector2 endV = {(float)child->x, (float)child->y};
+                        float endRadius = (child->node_type == "power_plant") ? 15.0f : 10.0f;
+
+                        bool is_green_fix_path = (fix_viz_state == VIZ_SHOWING_FIX) &&
+                                                 (edge == G.edge_being_fixed || path_edges_for_fix_viz.count(edge));
+
+                        bool is_orange_overload = (fix_viz_state == VIZ_SHOWING_OVERLOAD) &&
+                                                  (edge == G.edge_being_fixed);
+
+                        bool is_red_pulsing = G.overloaded_edges.count(edge);
+                        // -------------------------
+
+                        if (is_green_fix_path)
+                        {
+                            /* --- USER REQUEST: Draw fixed path as a thick green arrow ---
+                              Determine the correct path direction.*/
+
+                            Vector2 pathStart = startV;
+                            Vector2 pathEnd = endV;
+
+                            // Check if the path is running in reverse (child -> parent)
+                            bool reversed = false;
+                            for (size_t i = 1; i < G.fix_path.size(); ++i)
+                            {
+                                if (G.fix_path[i].second == edge && G.fix_path[i].first == parent)
+                                {
+                                    reversed = true;
+                                    break;
+                                }
+                            }
+                            if (reversed)
+                            {
+                                std::swap(pathStart, pathEnd);
+                                endRadius = (parent->node_type == "power_plant") ? 15.0f : 10.0f;
+                            }
+
+                            DrawArrow(pathStart, pathEnd, endRadius, 4.0f / camera.zoom, GREEN);
+                        }
+                        else if (is_orange_overload)
+                        {
+                            // --- USER REQUEST: Draw the edge being fixed as a thick orange ARROW ---
+                            DrawArrow(startV, endV, endRadius, 4.0f / camera.zoom, ORANGE);
+                        }
+                        else if (is_red_pulsing)
+                        {
+                            // --- USER REQUEST: Draw overloaded edges as pulsating red ARROWS ---
+                            thickness = 3.0f + sin(GetTime() * 10.0f) * 1.5f;
+                            DrawArrow(startV, endV, endRadius, thickness / camera.zoom, RED);
+                        }
+                        else
+                        {
+                            // --- USER REQUEST: Draw normal edges as simple LINES ---
+                            DrawLineEx(startV, endV, thickness / camera.zoom, edgeColor);
+                        }
+
+                        // Draw Selection Highlight (Yellow Outline) on top
+                        if (edge == selected_edge)
+                        {
+                            DrawLineEx(startV, endV, (thickness + 2.0f) / camera.zoom, YELLOW);
+                        }
+                    } // End if(drawEdge)
+                } // End edge loop
+            } // End A->A map loop
+
+            // --- Draw Edges (A -> B) ---
+            for (auto const &map_entry : G.adj_substion_consumer)
+            {
+                graph::Vertex_A *parent = map_entry.first;
+                for (auto &edge_pair : map_entry.second)
+                {
+                    graph::Vertex_B *child = edge_pair.first;
+                    graph::Edge *edge = edge_pair.second;
+
+                    if (camera.zoom >= ZOOM_LOD_CONSUMER)
+                    {
+                        Vector2 startV = {(float)parent->x, (float)parent->y};
+                        Vector2 endV = {(float)child->x, (float)child->y};
+
+                        // Determine child radius
+                        float endRadius = 5.0f;
+                        if (child->node_type != "residential")
+                            endRadius = 7.0f;
+
+                        DrawLineEx(startV, endV, 1.0f / camera.zoom, LIGHTGRAY);
+
+                        if (edge == selected_edge)
+                        {
+                            DrawLineEx(startV, endV, 4.0f / camera.zoom, YELLOW);
+                        }
+                    }
+                }
+            }
+            // --- Draw Nodes (on top of edges) ---
+            for (graph::Vertex_A *node : a_nodes_to_draw)
+            {
+                if (node->node_type == "power_plant")
+                {
+                    DrawNodeA(node);
+                    if (node == selected_a_node)
+                        DrawCircleLines(node->x, node->y, 17.0f, YELLOW);
+                }
+                else if (node->node_type == "substation" && camera.zoom >= ZOOM_LOD_SUBSTATION)
+                {
+                    DrawNodeA(node); // Draw blue circle
+
+                    // --- ADD THROTTLE HIGHLIGHT ---
+                    if (G.throttled_nodes_visual.count(node))
+                    {
+                        // Draw a purple circle over the blue one
+                        DrawCircle(node->x, node->y, 10.0f, RAYWHITE);
+                        DrawCircleLines(node->x, node->y, 10.0f, WHITE);
+                    }
+                    // -----------------------------
+                    if (G.node_overloads_visual.count(node))
+                    {
+                        // Highlight this node in BLACK as requested
+                        DrawCircle(node->x, node->y, 10.0f, BLACK);
+                        DrawCircleLines(node->x, node->y, 10.0f, DARKGRAY);
+                    }
+                    // --- END NEW ---
+                    if (node == selected_a_node)
+                        DrawCircleLines(node->x, node->y, 12.0f, YELLOW);
+                }
+            }
+
+            if (camera.zoom >= ZOOM_LOD_CONSUMER)
+            {
+                for (graph::Vertex_B *node : b_nodes_to_draw)
+                {
+                    DrawNodeB(node);
+                    float radius = (node->node_type == "residential") ? 5.0f : 7.0f;
+
+                    // --- ADD EVENT HIGHLIGHT ---
+                    if (node == G.last_demand_increase_consumer)
+                    {
+                        // Pulsating yellow outline
+                        float pulseRadius = radius + 2.0f + sin(GetTime() * 10.0f) * 1.5f;
+                        DrawRingLines({(float)node->x, (float)node->y}, pulseRadius - (2.0f / camera.zoom), pulseRadius, 0, 360, 36, Fade(YELLOW, 0.8f));
+                    }
+                    // --------------------------
+
+                    if (node == selected_b_node)
+                    {
+                        DrawCircleLines(node->x, node->y, radius + 2.0f, YELLOW);
+                    }
+                }
+            }
+            EndMode2D();
+
+            // --- Draw UI (Overlay) ---
+            DrawText("Power Grid Visualizer", 10, 10, 20, WHITE);
+            DrawText("Power Plant  ", 10, 35, 18, WHITE);
+            DrawCircle(165, 44, 7.0f, PINK);
+            DrawText("Substation   ", 10, 55, 18, WHITE);
+            DrawCircle(165, 64, 7.0f, BLUE);
+            DrawText("Resident     ", 10, 75, 18, WHITE);
+            DrawCircle(165, 84, 7.0f, BROWN);
+            DrawText("Hospital     ", 10, 95, 18, WHITE);
+            DrawCircle(165, 104, 7.0f, DARKBLUE);
+            DrawText("Institute    ", 10, 115, 18, WHITE);
+            DrawCircle(165, 124, 7.0f, PURPLE);
+            DrawText("Industry     ", 10, 135, 18, WHITE);
+            DrawCircle(165, 144, 7.0f, ORANGE);
+            DrawFPS(screenWidth - 100, 10);
+            DrawRectangle(screenWidth - 255, 5, 250, 130, Fade(BLACK, 0.7f)); // <-- INCREASE HEIGHT
+            DrawText("[I] Increase Random Demand", screenWidth - 250, 10, 18, WHITE);
+            DrawText("[O] Fix Edge/Throttle Node", screenWidth - 250, 35, 18, WHITE); // <-- Wording changed
+            DrawText("[U] Upgrade Selected Node", screenWidth - 250, 60, 18, WHITE);  // <-- ADD THIS
+            DrawText("[C] Clear Highlights", screenWidth - 250, 85, 18, WHITE);       // <-- y-pos changed
+            DrawText("[BACKSPACE] Main Menu", screenWidth - 250, 110, 18, WHITE);     // <-- y-pos changed
+            // --- Draw Inspector Panel ---
+            if (selected_a_node != nullptr)
+            {
+                // ---Check if this selected node is overloaded ---
+                if (G.node_overloads_visual.count(selected_a_node))
+                {
+                    // --- Show the special prompt ---
+                    string type = "Type: " + selected_a_node->node_type;
+                    string status = "STATUS: NODE OVERLOADED";
+                    string load = "Load: " + to_string(selected_a_node->current_downstream_demand);
+                    string limit = "Limit: " + to_string(selected_a_node->max_limit);
+                    string prompt2 = "Press 'U' to upgrade limit";
+
+                    DrawRectangle(10, 170, 270, 140, Fade(BLACK, 0.8f)); // Panel is bigger
+                    DrawText("--- SELECTED NODE ---", 15, 175, 16, YELLOW);
+                    DrawText(type.c_str(), 15, 195, 18, WHITE);
+                    DrawText(status.c_str(), 15, 215, 18, RED);
+                    DrawText(load.c_str(), 15, 235, 18, ORANGE);
+                    DrawText(limit.c_str(), 15, 255, 18, WHITE);
+                    DrawText(prompt2.c_str(), 15, 275, 18, WHITE);
+                }
+                else
+                {
+                    // --- Show the normal panel ---
+                    string type = "Type: " + selected_a_node->node_type;
+                    string load = "Current Load: " + to_string(selected_a_node->current_downstream_demand);
+                    string limit = "Max Limit: " + to_string(selected_a_node->max_limit);
+
+                    DrawRectangle(10, 170, 250, 80, Fade(BLACK, 0.7f));
+                    DrawText("--- SELECTED NODE ---", 15, 175, 16, YELLOW);
+                    DrawText(type.c_str(), 15, 195, 18, WHITE);
+                    DrawText(load.c_str(), 15, 215, 18, WHITE);
+                    DrawText(limit.c_str(), 15, 235, 18, WHITE);
+                }
+            }
+            else if (selected_b_node != nullptr)
+            {
+                string type = "Type: " + selected_b_node->node_type;
+                string demand = "Demand: " + to_string(selected_b_node->demand);
+
+                DrawRectangle(10, 170, 250, 60, Fade(BLACK, 0.7f));
+                DrawText("--- SELECTED NODE ---", 15, 175, 16, YELLOW);
+                DrawText(type.c_str(), 15, 195, 18, WHITE);
+                DrawText(demand.c_str(), 15, 215, 18, WHITE);
+            }
+            else if (selected_edge != nullptr)
+            {
+                string load = "Current Load: " + to_string(selected_edge->current_load);
+                string max_load_str = "Max Load: " + to_string(selected_edge->max_load);
+
+                DrawRectangle(10, 170, 250, 60, Fade(BLACK, 0.7f));
+                DrawText("--- SELECTED EDGE ---", 15, 175, 16, YELLOW);
+                DrawText(load.c_str(), 15, 195, 18, WHITE);
+                DrawText(max_load_str.c_str(), 15, 215, 18, WHITE);
+            }
+
+            EndDrawing();
+        }
+        break;
         }
     }
 
