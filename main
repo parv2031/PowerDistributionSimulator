@@ -1350,6 +1350,7 @@ enum GameState
     STATE_VISUALIZATION
 };
 
+//RAYLIB MAIN FUNCTION
 int main(){
 
     ios::sync_with_stdio(false);
@@ -1570,6 +1571,248 @@ int main(){
             EndDrawing();
         }
         break;
+
+        case STATE_VISUALIZATION:
+        {
+            // --- Pre-populate node lists for update and draw phases ---
+            visited_nodes.clear();
+            a_nodes_to_draw.clear();
+            b_nodes_to_draw.clear();
+
+            for (auto const &map_entry : G.adj_power_substation)
+            {
+                graph::Vertex_A *parent = map_entry.first;
+                if (visited_nodes.find(parent) == visited_nodes.end())
+                {
+                    a_nodes_to_draw.push_back(parent);
+                    visited_nodes.insert(parent);
+                }
+                for (auto &edge_pair : map_entry.second)
+                {
+                    graph::Vertex_A *child = edge_pair.first;
+                    if (visited_nodes.find(child) == visited_nodes.end())
+                    {
+                        a_nodes_to_draw.push_back(child);
+                        visited_nodes.insert(child);
+                    }
+                }
+            }
+            for (auto const &map_entry : G.adj_substion_consumer)
+            {
+                graph::Vertex_A *parent = map_entry.first;
+                if (visited_nodes.find(parent) == visited_nodes.end())
+                {
+                    a_nodes_to_draw.push_back(parent);
+                    visited_nodes.insert(parent);
+                }
+                for (auto &edge_pair : map_entry.second)
+                {
+                    graph::Vertex_B *child = edge_pair.first;
+                    if (visited_nodes.find(child) == visited_nodes.end())
+                    {
+                        b_nodes_to_draw.push_back(child);
+                        visited_nodes.insert(child);
+                    }
+                }
+            }
+            /*Apply any demand reduction from the *previous* frame's failed fixes
+               This MUST be called every frame.*/
+            G.apply_demand_reduction_updates();
+
+            // --- Update Camera ---
+            camera.zoom += ((float)GetMouseWheelMove() * 0.05f);
+            if (camera.zoom > 3.0f)
+                camera.zoom = 3.0f;
+            if (camera.zoom < 0.1f)
+                camera.zoom = 0.1f;
+
+            if (IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+            {
+                Vector2 delta = GetMouseDelta();
+                delta = Vector2Scale(delta, -1.0f / camera.zoom);
+                camera.target = Vector2Add(camera.target, delta);
+            }
+            if (IsKeyPressed(KEY_I))
+            {
+                // Clear fix visualization if demand changes
+                fix_viz_state = VIZ_IDLE;
+                G.edge_being_fixed = nullptr;
+                G.fix_path.clear();
+                G.throttled_nodes_visual.clear();
+                graph::Vertex_B *event_node = G.increase_random_consumer_demand();
+                G.check_node_overloads();
+                // If the function successfully found a node...
+                if (event_node != nullptr)
+                {
+                    // De-select whatever else was selected
+                    selected_a_node = nullptr;
+                    selected_edge = nullptr;
+
+                    // Set the event node as the new selected node
+                    selected_b_node = event_node;
+                    camera.target = (Vector2){(float)event_node->x, (float)event_node->y};
+                    // Zoom in to a close-up level
+                    camera.zoom = 1.5f;
+                }
+                //G.overloading_edge();
+                //G.apply_demand_reduction_updates();
+            }
+            if (IsKeyPressed(KEY_O))
+            {
+                // Clear any previous fix visualization first
+                fix_viz_state = VIZ_IDLE;
+                G.edge_being_fixed = nullptr;
+                G.fix_path.clear();
+                G.last_demand_increase_consumer = nullptr;
+                G.overloading_edge(); // This runs fix_overloading_problem internally
+                G.check_node_overloads();
+
+                // Check if a fix was applied and stored
+                if (G.edge_being_fixed != nullptr)
+                {
+                    fix_viz_state = VIZ_SHOWING_OVERLOAD; // Start visualization sequence
+                    fix_highlight_start_time = GetTime(); // Record start time
+                    cout << "Starting fix visualization for edge: " << G.edge_being_fixed << endl;
+                }
+                else
+                {
+                    cout << "Overload check ran, but no fixable overload was processed or stored for visualization." << endl;
+                }
+                G.apply_demand_reduction_updates();
+            }
+            if (IsKeyPressed(KEY_U))
+            {
+                // This calls the new function on the currently selected node
+                G.upgrade_selected_node_limit(selected_a_node);
+            }
+            if (IsKeyPressed(KEY_C))
+            {
+                G.overloaded_edges.clear();   // Clear the highlights
+                G.edge_being_fixed = nullptr; // Clear green edge highlight
+                G.fix_path.clear();
+                fix_viz_state = VIZ_IDLE;
+                G.throttled_nodes_visual.clear();
+                G.node_overloads_visual.clear(); 
+                cout << "Cleared all highlights." << endl;
+            }
+            if (IsKeyPressed(KEY_BACKSPACE))
+            {
+                G = graph();                // Clear graph
+                currentState = STATE_INPUT; // Go back to input screen
+            }
+            // --- Update selection state ---
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+            {
+                Vector2 worldMousePos = GetScreenToWorld2D(GetMousePosition(), camera);
+
+                selected_a_node = nullptr;
+                selected_b_node = nullptr;
+                selected_edge = nullptr;
+
+                bool foundClick = false;
+
+                // Check B-Nodes
+                if (camera.zoom >= ZOOM_LOD_CONSUMER)
+                {
+                    for (auto *node : b_nodes_to_draw)
+                    {
+                        float radius = 5.0f;
+                        if (node->node_type == "hospital" || node->node_type == "industrial" || node->node_type == "institute")
+                            radius = 7.0f;
+
+                        if (CheckCollisionPointCircle(worldMousePos, {(float)node->x, (float)node->y}, radius))
+                        {
+                            selected_b_node = node;
+                            foundClick = true;
+                            break;
+                        }
+                    }
+                }
+
+                // Check A-Nodes
+                if (!foundClick)
+                {
+                    for (auto *node : a_nodes_to_draw)
+                    {
+                        float radius = 0.0f;
+                        if (node->node_type == "power_plant")
+                        {
+                            radius = 15.0f;
+                        }
+                        else if (node->node_type == "substation" && camera.zoom >= ZOOM_LOD_SUBSTATION)
+                        {
+                            radius = 10.0f;
+                        }
+
+                        if (radius > 0.0f && CheckCollisionPointCircle(worldMousePos, {(float)node->x, (float)node->y}, radius))
+                        {
+                            selected_a_node = node;
+                            foundClick = true;
+                            break;
+                        }
+                    }
+                }
+
+                const int lineClickThreshold = 5;
+
+                // Check Edges (A -> A)
+                if (!foundClick)
+                {
+                    if (camera.zoom >= ZOOM_LOD_SUBSTATION)
+                    {
+                        for (auto const &map_entry : G.adj_power_substation)
+                        {
+                            graph::Vertex_A *parent = map_entry.first;
+                            for (auto &edge_pair : map_entry.second)
+                            {
+                                graph::Vertex_A *child = edge_pair.first;
+                                graph::Edge *edge = edge_pair.second;
+
+                                if (CheckCollisionPointLine(worldMousePos,
+                                                            {(float)parent->x, (float)parent->y},
+                                                            {(float)child->x, (float)child->y},
+                                                            lineClickThreshold / camera.zoom))
+                                {
+                                    selected_edge = edge;
+                                    foundClick = true;
+                                    break;
+                                }
+                            }
+                            if (foundClick)
+                                break;
+                        }
+                    }
+                }
+
+                // Check Edges (A -> B)
+                if (!foundClick)
+                {
+                    if (camera.zoom >= ZOOM_LOD_CONSUMER)
+                    {
+                        for (auto const &map_entry : G.adj_substion_consumer)
+                        {
+                            graph::Vertex_A *parent = map_entry.first;
+                            for (auto &edge_pair : map_entry.second)
+                            {
+                                graph::Vertex_B *child = edge_pair.first;
+                                graph::Edge *edge = edge_pair.second;
+
+                                if (CheckCollisionPointLine(worldMousePos,
+                                                            {(float)parent->x, (float)parent->y},
+                                                            {(float)child->x, (float)child->y},
+                                                            lineClickThreshold / camera.zoom))
+                                {
+                                    selected_edge = edge;
+                                    foundClick = true;
+                                    break;
+                                }
+                            }
+                            if (foundClick)
+                                break;
+                        }
+                    }
+                }
+
 
         
         }
