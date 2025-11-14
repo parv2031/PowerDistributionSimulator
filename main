@@ -44,4 +44,32 @@ public:
         }
     };
 
+    class Edge
+    {
+    public:
+        float loss;
+        float max_load;
+        float current_load;
+
+        // constructor
+        Edge(Vertex_A *Node_1, Vertex_A *Node_2) : loss(0), max_load(0), current_load(0)
+        { // from Node_1 to Node_2
+            if (Node_1->node_type == "power_plant" && Node_2->node_type == "substation")
+            {
+                loss = 2 + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / (5 - 2))); // between 2-5 kW
+            }
+            else if (Node_1->node_type == "substation" && Node_2->node_type == "substation")
+            {
+                loss = 1 + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / (3 - 1))); // between 1-3 kW
+            }
+        };
+
+        Edge(Vertex_A *Node_1, Vertex_B *Node_2)
+        {                                                                                             // from Node_1 to Node_2
+            loss = 0.5 + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / (1.0f - 0.5f))); // between 0.5 to 1 kw
+            max_load = 3.0f * Node_2->demand;                                                         // Max load has a safety factor
+            current_load = Node_2->demand;                                                            // Current load is the demand
+        }
+    };
+
 } ;
