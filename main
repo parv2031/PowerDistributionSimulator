@@ -7,6 +7,13 @@
 #include "raymath.h"
 
 using namespace std;
+
+// global variable
+int resident_demand, hospital_demand, industry_demand, institute_demand;
+static random_device rd;
+static mt19937 g(rd());
+
+
 class graph{
 public:
     class Vertex_A
