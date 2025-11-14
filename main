@@ -1244,5 +1244,44 @@ public:
             }
         }
     }
+    void upgrade_selected_node_limit(Vertex_A *selected_node)
+    {
+        if (selected_node == nullptr || selected_node->node_type == "power_plant")
+        {
+            cout << "Upgrade: No valid substation selected." << endl;
+            return;
+        }
+
+        // Only upgrade if it's actually overloaded
+        if (node_overloads_visual.count(selected_node))
+        {
+            // Calculate a 25% increase
+            float increase_amount = selected_node->max_limit * 0.25f;
+
+            // make sure it's at least enough to cover the deficit
+            float deficit = selected_node->current_downstream_demand - selected_node->max_limit;
+            if (increase_amount < deficit)
+            {
+                increase_amount = deficit * 1.1f; // Add 10% safety buffer
+            }
+
+            cout << "--- Node Upgrade ---" << endl;
+            cout << "Upgrading node " << selected_node << " limit." << endl;
+            cout << "  Old Limit: " << selected_node->max_limit << endl;
+            selected_node->max_limit += increase_amount;
+            cout << "  New Limit: " << selected_node->max_limit << endl;
+
+            
+            unordered_set<Vertex_A *> visited;
+            propagate_limit_increase(selected_node, increase_amount, visited);
+
+            // Re-run the check
+            check_node_overloads();
+        }
+        else
+        {
+            cout << "Upgrade: Selected node is not overloaded." << endl;
+        }
+    }
 
 } ;
