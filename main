@@ -1215,6 +1215,34 @@ public:
         nodes_to_throttle.clear(); // Clear the map after processing
         cout << "------------------------------------------------" << endl;
     }
-    
+
+    void check_node_overloads()
+    {
+        node_overloads_visual.clear(); // Clear previous state
+
+        // We must check all nodes in the graph.
+        unordered_set<Vertex_A *> all_nodes;
+        for (auto const &[parent, children] : adj_power_substation)
+        {
+            all_nodes.insert(parent);
+            for (auto const &pair : children)
+                all_nodes.insert(pair.first);
+        }
+        for (auto const &[parent, children] : adj_substion_consumer)
+        {
+            all_nodes.insert(parent);
+        }
+
+        for (auto *node : all_nodes)
+        {
+            if (node->node_type == "power_plant")
+                continue; // Skip power plants
+
+            if (node->current_downstream_demand > node->max_limit)
+            {
+                node_overloads_visual.insert(node);
+            }
+        }
+    }
 
 } ;
