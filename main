@@ -371,6 +371,7 @@ private:
 
         return nullptr; // No edge found in either direction
     }
+
     // Struct to hold state in our priority queue
     struct PathState
     {
@@ -386,6 +387,75 @@ private:
             return min_available_capacity < other.min_available_capacity;
         }
     };
+
+    pair<float, vector<pair<Vertex_A *, Edge *>>> find_highest_capacity_path(
+        Vertex_A *source,
+        Vertex_A *target)
+    {
+        // MAX-priority queue: {bottleneck_capacity, path_vector}
+        priority_queue<PathState> pq; 
+
+        // Start with the source node
+        vector<pair<Vertex_A *, Edge *>> initial_path;
+        initial_path.push_back({source, nullptr});
+        pq.push(PathState(std::numeric_limits<float>::max(), initial_path));
+
+        // Map to track the max capacity to reach a node
+        unordered_map<Vertex_A *, float> max_capacity_map;
+        max_capacity_map[source] = std::numeric_limits<float>::max();
+
+        // Track the best (complete) path found so far
+        float best_path_capacity = 0.0f;
+        vector<pair<Vertex_A *, Edge *>> best_path;
+
+        while (!pq.empty())
+        {
+            PathState current = pq.top();
+            pq.pop();
+
+            Vertex_A *current_node = current.path.back().first;
+            float current_capacity = current.min_available_capacity;
+
+            // If this is a worse path than one we've already found, skip it
+            if (max_capacity_map.count(current_node) && current_capacity < max_capacity_map[current_node])
+            {
+                continue;
+            }
+
+            // --- FOUND A PATH TO THE TARGET ---
+            if (current_node == target)
+            {
+                
+                if (current_capacity > best_path_capacity)
+                {
+                    best_path_capacity = current_capacity;
+                    best_path = current.path;
+                }
+                
+                continue;
+            }
+
+            // --- Explore neighbors in both directions ---
+            // 1. Forward neighbors (A -> B)
+            if (adj_power_substation.count(current_node))
+            {
+                for (auto &[neighbor_node, edge] : adj_power_substation[current_node])
+                {
+                    try_add_capacity_path(current, neighbor_node, edge, pq, max_capacity_map);
+                }
+            }
+            // 2. Reverse neighbors (B -> A)
+            if (adj_reverse_power.count(current_node))
+            {
+                for (auto &[neighbor_node, edge] : adj_reverse_power[current_node])
+                {
+                    try_add_capacity_path(current, neighbor_node, edge, pq, max_capacity_map);
+                }
+            }
+        }
+        return {best_path_capacity, best_path};
+    }
+
 
 public:
     vector<pair<string, pair<int, int>>> layout_graph()
