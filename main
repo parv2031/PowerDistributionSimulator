@@ -628,4 +628,80 @@ public:
         return nullptr;
     }
 
+   // Helper struct to store and sort overload problems
+    struct OverloadInfo
+    {
+        float ratio; // e.g., 0.95 (95%)
+        Vertex_A *source;
+        Vertex_A *target;
+        Edge *edge;
+
+        // Sort by overload ratio, descending (most severe first)
+        bool operator>(const OverloadInfo &other) const
+        {
+            return ratio > other.ratio;
+        }
+    };
+    void overloading_edge()
+    {
+        // --- STAGE 1: DISCOVERY ---
+        vector<OverloadInfo> problems_to_fix;
+
+        // Clear visualization state from the *previous* frame
+        overloaded_edges.clear();
+        edge_being_fixed = nullptr; // These will be set by the first fix
+        fix_path.clear();
+
+        throttled_nodes_visual.clear();
+
+        // Find ALL overloaded edges in a single pass
+        for (auto &[source, neighbors] : adj_power_substation)
+        {
+            for (auto &[target, edge] : neighbors)
+            {
+                if (edge->max_load > 0.01f) // Avoid division by zero
+                {
+                    float ratio = edge->current_load / edge->max_load;
+                    if (ratio >= 0.75f)
+                    {
+                        problems_to_fix.push_back({ratio, source, target, edge});
+                        overloaded_edges.insert(edge); // Add to set for *initial* red highlighting
+                    }
+                }
+            }
+        }
+
+        // --- STAGE 2: TRIAGE ---
+        if (problems_to_fix.empty())
+        {
+            return;
+        }
+
+        sort(problems_to_fix.begin(), problems_to_fix.end(), std::greater<OverloadInfo>());
+
+        // --- STAGE 3: FIX ---
+        bool fix_was_applied_this_tick = false;
+
+        for (auto &problem : problems_to_fix)
+        {
+            if (overloaded_edges.count(problem.edge))
+            {
+                bool visualize_this_fix = !fix_was_applied_this_tick;
+
+                
+                if (fix_overloading_problem(problem.source, problem.target, problem.edge, visualize_this_fix)) // <-- REMOVE available_path
+                {
+                    fix_was_applied_this_tick = true;
+                }
+                else
+                {
+                    if (!nodes_to_throttle.empty())
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
 } ;
