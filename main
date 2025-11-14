@@ -81,6 +81,15 @@ public:
     unordered_map<Vertex_A *, vector<pair<Vertex_B *, Edge *>>> adj_substion_consumer; // adj list of substation to consumers
     unordered_map<Vertex_A *, vector<pair<Vertex_A *, Edge *>>> adj_power_substation;  // adj list of substation to substaiton and power_plant to substations
     unordered_map<Vertex_A *, vector<pair<Vertex_A *, Edge *>>> adj_reverse_power;
+    unordered_set<Edge *> overloaded_edges;
+    Edge *edge_being_fixed = nullptr; // Pointer to the specific edge we are fixing
+    unordered_map<Vertex_A *, float> nodes_to_throttle;
+    unordered_set<Vertex_A *> node_overloads_visual; // Tracks nodes where demand > limit
+    unordered_set<Vertex_A *> throttled_nodes_visual;
+    vector<pair<Vertex_A *, Edge *>> fix_path; // The alternative path used
+    Vertex_B *last_demand_increase_consumer = nullptr;
+    Vertex_A *last_event_substation = nullptr;        // Store the substation linked to the last 'I' key event
+    Color last_event_substation_color = {0, 0, 0, 0}; // Store the highlight color, initialized to transparent
     
 
     // --- Graph Generation Functions ---
