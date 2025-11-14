@@ -545,6 +545,51 @@ private:
         visited_propagation.erase(node); // Backtrack
     }
 
+    // Helper function for the Dijkstra's search
+    bool can_handle_increase(Vertex_A *node, float increase, unordered_set<Vertex_A *> &visited)
+    {
+        // Prevent infinite recursion in cycles
+        if (visited.count(node))
+        {
+            return true;
+        }
+        visited.insert(node);
+
+        bool all_parents_ok = true;
+        bool has_at_least_one_parent = false;
+
+        // Traverse all power-substation adjacency pairs to find parent edges
+        for (auto &[potential_parent, neighbors] : adj_power_substation)
+        {
+            for (auto &[child, edge] : neighbors)
+            {
+                if (child == node)
+                {
+                    has_at_least_one_parent = true;
+
+                    // 1. Check if this edge can handle the additional load
+                    if (edge->current_load + increase > edge->max_load)
+                    {
+                        all_parents_ok = false;
+                        break; 
+                    }
+
+                    // 2. Recursively check further upstream edges from the parent
+                    if (!can_handle_increase(potential_parent, increase, visited))
+                    {
+                        all_parents_ok = false;
+                        break; 
+                    }
+                }
+            }
+            if (!all_parents_ok)
+                break;
+        }
+        visited.erase(node);
+        return all_parents_ok;
+    }
+    
+
 public:
     vector<pair<string, pair<int, int>>> layout_graph()
     {
@@ -1056,6 +1101,79 @@ public:
             nodes_to_throttle[target] += load_to_reduce; 
             return false; // No fix applied this tick
         }
+    }
+
+    void apply_demand_reduction_updates()
+    {
+        if (nodes_to_throttle.empty())
+        {
+            return;
+        }
+
+        cout << "--- Applying Precision Demand Reduction (Throttling) ---" << endl;
+
+        // NEW: Iterate the map to get the substation AND the amount to reduce
+        for (auto const &[substation, required_reduction] : nodes_to_throttle)
+        {
+            if (!adj_substion_consumer.count(substation) || required_reduction <= 0.01f)
+            {
+                continue; // This substation has no consumers or no reduction needed
+            }
+
+            // ---  Distribute the reduction proportionally ---
+
+            // 1. Find the total demand at this substation
+            float total_demand_at_substation = 0.0f;
+            for (auto &[consumer, edge] : adj_substion_consumer[substation])
+            {
+                total_demand_at_substation += consumer->demand;
+            }
+
+            float total_demand_reduction_applied = 0.0f; // Track the *actual* change
+            float epsilon = 0.01f;
+
+            if (total_demand_at_substation < epsilon)
+            {
+                // No demand to reduce, can't fix it.
+                cout << "   -> Node " << substation << " has 0 consumer demand. Cannot apply reduction." << endl;
+                continue;
+            }
+
+            // 2. Iterate consumers and apply their share of the reduction
+            for (auto &[consumer, edge] : adj_substion_consumer[substation])
+            {
+                // Calculate this consumer's share of the reduction
+                float proportion = consumer->demand / total_demand_at_substation;
+                float delta = -required_reduction * proportion; // delta is a negative number
+
+                // Don't let demand go below zero
+                if (consumer->demand + delta < 0)
+                {
+                    delta = -consumer->demand;
+                }
+
+                if (delta < -epsilon) // Only apply if there's a real change
+                {
+                    consumer->demand += delta;
+                    edge->current_load += delta; // Update local edge
+                    total_demand_reduction_applied += delta;
+                }
+            }
+
+            // 3. If we reduced demand, propagate this *single* change up the network
+            if (total_demand_reduction_applied < -epsilon)
+            {
+                throttled_nodes_visual.insert(substation);
+                cout << "   Throttled node " << substation << ". Total demand reduced by: " << fixed << setprecision(2) << total_demand_reduction_applied << " kW" << endl;
+
+                unordered_set<Vertex_A *> visited_propagation;
+                // Propagate the *actual* amount reduced
+                propagate_demand_change(substation, total_demand_reduction_applied, visited_propagation);
+            }
+        }
+
+        nodes_to_throttle.clear(); // Clear the map after processing
+        cout << "------------------------------------------------" << endl;
     }
     
 
