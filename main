@@ -456,6 +456,94 @@ private:
         return {best_path_capacity, best_path};
     }
 
+    // Helper function for the "widest path" search
+    void try_add_capacity_path(
+        const PathState &current_state,
+        Vertex_A *next_node,
+        Edge *edge,
+        priority_queue<PathState> &pq,
+        unordered_map<Vertex_A *, float> &max_capacity_map)
+    {
+        // Check for cycles
+        for (const auto &pair : current_state.path)
+        {
+            if (pair.first == next_node)
+                return;
+        }
+
+        // --- 1. Calculate New Bottleneck Capacity ---
+        float edge_available_capacity = edge->max_load - edge->current_load;
+        float new_min_capacity = std::min(current_state.min_available_capacity, edge_available_capacity);
+
+        // --- 2. Skip edges with zero or negative capacity
+        if (new_min_capacity <= 0.01f)
+        {
+            return;
+        }
+
+        // --- 3. Add to Queue if it's a better path to this *node* ---
+        if (!max_capacity_map.count(next_node) || new_min_capacity > max_capacity_map[next_node])
+        {
+            max_capacity_map[next_node] = new_min_capacity;
+
+            vector<pair<Vertex_A *, Edge *>> new_path = current_state.path;
+            new_path.push_back({next_node, edge});
+
+            pq.push(PathState(new_min_capacity, new_path));
+        }
+    }
+    void propagate_demand_change(Vertex_A *node, float delta, unordered_set<Vertex_A *> &visited_propagation)
+    {
+        // Prevent infinite recursion in cyclic graphs
+        if (visited_propagation.count(node))
+        {
+            return;
+        }
+        visited_propagation.insert(node);
+
+        // 1. Apply the demand change to this node
+        node->current_downstream_demand += delta;
+
+        // 2. Find parents (FAST O(1) lookup)
+        if (!adj_reverse_power.count(node))
+        {
+            visited_propagation.erase(node); // Backtrack
+            return;                          // This is a power plant
+        }
+
+        // 3. Find total capacity of all parent links
+        float total_incoming_capacity = 0.0f;
+        float epsilon = 0.01f;
+        for (auto &[parent, edge] : adj_reverse_power[node])
+        {
+            total_incoming_capacity += edge->max_load;
+        }
+
+        // 4. Propagate the delta PROPORTIONALLY to all parents.
+        for (auto &[parent_node, parent_edge] : adj_reverse_power[node])
+        {
+            float proportional_delta = 0.0f;
+
+            if (total_incoming_capacity > epsilon)
+            {
+                float proportion = parent_edge->max_load / total_incoming_capacity;
+                proportional_delta = delta * proportion;
+            }
+            else
+            {
+                // Fallback: split equally
+                proportional_delta = delta / adj_reverse_power[node].size();
+            }
+
+            // a. Apply the change to the connecting edge's load
+            parent_edge->current_load += proportional_delta;
+
+            // b. Recursively call for the parent node
+            propagate_demand_change(parent_node, proportional_delta, visited_propagation);
+        }
+
+        visited_propagation.erase(node); // Backtrack
+    }
 
 public:
     vector<pair<string, pair<int, int>>> layout_graph()
