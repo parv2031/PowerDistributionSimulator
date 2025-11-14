@@ -704,4 +704,133 @@ public:
         }
     }
 
+    bool fix_overloading_problem(Vertex_A *source, Vertex_A *target,
+                                 Edge *overloaded_edge,
+                                 bool visualize_this_fix)
+    {
+        // --- 1. Validate ---
+        if (!overloaded_edge) return false;
+
+        // --- 2. Calculate required load reduction ---
+        float overload_threshold = 0.75f;
+        float target_load_factor = 0.70f;
+        float current_load_factor = (overloaded_edge->max_load > 0) ? (overloaded_edge->current_load / overloaded_edge->max_load) : 1.0f;
+        float load_to_reduce = overloaded_edge->current_load - (target_load_factor * overloaded_edge->max_load);
+        float epsilon = 0.01f;
+
+        // --- 3. Check if reduction is still needed ---
+        if (current_load_factor < overload_threshold || load_to_reduce < epsilon)
+        {
+            if (current_load_factor < overload_threshold) {
+                overloaded_edges.erase(overloaded_edge);
+            }
+            return false; // No fix applied
+        }
+
+        // --- 4. Find the path with the HIGHEST available capacity ---
+        auto [max_available_capacity, best_path] = find_highest_capacity_path(source, target);
+
+        // --- 5. Decide if this path is good enough ---
+        bool path_is_usable = false;
+        float actual_rerouted_load = 0.0f;
+
+        // Check if a path was found AND it's not just the source
+        if (!best_path.empty() && best_path.size() > 1)
+        {
+            // We can reroute *at most* what the path can handle
+            actual_rerouted_load = std::min(load_to_reduce, max_available_capacity);
+
+            // ---  Minimum Partial Fix (20% rule) ---
+            if (actual_rerouted_load < (load_to_reduce * 0.20f))
+            {
+                cout << "Load Balancing: Found path, but capacity " << max_available_capacity << " is < 20% of required " << load_to_reduce << ". Throttling." << endl;
+            }
+            else
+            {
+                // --- Stability Check (75% rule) ---
+                bool path_is_stable = true;
+                for (size_t i = 1; i < best_path.size(); ++i)
+                {
+                    Edge* path_edge = best_path[i].second;
+                    if (path_edge->max_load > epsilon)
+                    {
+                        float new_load = path_edge->current_load + actual_rerouted_load;
+                        if (new_load / path_edge->max_load >= overload_threshold)
+                        {
+                            path_is_stable = false;
+                            cout << "Load Balancing: Found path, but it would become unstable. Throttling." << endl;
+                            break;
+                        }
+                    }
+                }
+                
+                if (path_is_stable)
+                {
+                    path_is_usable = true;
+                }
+            }
+        }
+        
+        // --- 6.  Apply Fix or Throttle ---
+        if (path_is_usable)
+        {
+            // ---  Apply Best Possible Fix (Partial or Full) ---
+            cout << "--- Load Balancing Action ---" << endl;
+            cout << "Overloaded Edge: (" << source << " -> " << target << ")" << endl;
+            cout << "   Original Load: " << overloaded_edge->current_load << " / " << overloaded_edge->max_load << " (" << fixed << setprecision(1) << current_load_factor * 100 << "%)" << endl;
+            cout << "   Strategy: Found highest-capacity STABLE path." << endl;
+            cout << "   Path Capacity: " << fixed << setprecision(2) << max_available_capacity << endl;
+            cout << "   Required Reduction: " << fixed << setprecision(2) << load_to_reduce << endl;
+            cout << "   ACTUAL Rerouting Load: " << fixed << setprecision(2) << actual_rerouted_load << endl;
+
+            // --- 7. Apply Changes ---
+            overloaded_edge->current_load -= actual_rerouted_load;
+            cout << "   New Load on Original Edge: " << overloaded_edge->current_load << " / " << overloaded_edge->max_load << endl;
+            cout << "   Via Path: " << source;
+
+            for (int i = 1; i < best_path.size(); ++i)
+            {
+                Vertex_A *path_node_child = best_path[i].first;
+                Edge *path_edge = best_path[i].second;
+
+                path_edge->current_load += actual_rerouted_load;
+                cout << " -> (" << path_node_child << " | New Edge Load: " << path_edge->current_load << ")";
+            }
+            cout << endl;
+
+            // Check if the *original* edge is still overloaded
+            if ((overloaded_edge->current_load / overloaded_edge->max_load) >= overload_threshold)
+            {
+                cout << "   Status: STILL OVERLOADED (Partial Fix Applied)" << endl;
+            }
+            else
+            {
+                overloaded_edges.erase(overloaded_edge);
+                cout << "   Status: OK (Fixed)" << endl;
+            }
+
+            if (visualize_this_fix)
+            {
+                edge_being_fixed = overloaded_edge;
+                fix_path = best_path;
+            }
+
+            cout << "---------------------------" << endl;
+            return true; // A fix was applied
+        }
+        else
+        {
+            // ---  No Usable Path Found -> Throttle ---
+            if (best_path.empty()) {
+                cout << "Load Balancing: Overload on edge (" << source << " -> " << target << "). No alternative paths exist." << endl;
+            } // (Other failure cases already logged above)
+            
+            cout << "   -> SCHEDULING PRECISION DEMAND REDUCTION for node: " << target << " by " << fixed << setprecision(2) << load_to_reduce << " kW" << endl;
+            
+            overloaded_edges.erase(overloaded_edge);
+            nodes_to_throttle[target] += load_to_reduce; 
+            return false; // No fix applied this tick
+        }
+    }
+
 } ;
