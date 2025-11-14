@@ -504,5 +504,72 @@ public:
         }
         return coordinates_list;
     }
+    void add_realistic_connections(int k_nearest = 2) // k_nearsest -->number of substations a substation be connected
+    {
+        // 1. Collect all substations from all adjacency lists
+        unordered_set<Vertex_A *> sub_set;
+        for (auto &entry : adj_substion_consumer)
+        {
+            sub_set.insert(entry.first); // Add all subs that have consumers
+        }
+        for (auto &entry : adj_power_substation)
+        {
+            if (entry.first->node_type == "substation")
+                sub_set.insert(entry.first);
+            for (auto &pair : entry.second)
+            {
+                if (pair.first->node_type == "substation")
+                    sub_set.insert(pair.first);
+            }
+        }
+
+        vector<Vertex_A *> all_substations(sub_set.begin(), sub_set.end());
+        if (all_substations.size() < k_nearest + 1)
+            return; // Not enough to connect
+
+        // 2. For each substation, find its k-nearest neighbors and connect
+        for (auto *sub1 : all_substations)
+        {
+            priority_queue<pair<double, Vertex_A *>> pq;
+
+            for (auto *sub2 : all_substations)
+            {
+                if (sub1 == sub2)
+                    continue; // Don't connect to self
+
+                double dist = GetDistance(sub1->x, sub1->y, sub2->x, sub2->y);
+
+                if (pq.size() < k_nearest)
+                {
+                    pq.push({dist, sub2});
+                }
+                else if (dist < pq.top().first)
+                {
+                    // If this node is closer than the "farthest" of the k-nearest
+                    pq.pop();
+                    pq.push({dist, sub2});
+                }
+            }
+
+            // 3. Add edges to the k-nearest neighbors
+            while (!pq.empty())
+            {
+                Vertex_A *sub2 = pq.top().second;
+                pq.pop();
+
+                // If an edge doesn't already exist (in either direction)
+                if (!DoesEdgeExist(sub1, sub2))
+                {
+                    // Create a "unnecessary" edge for visual/backup purposes
+                    Edge *edge = new Edge(sub1, sub2);
+                    edge->current_load = 0;                                 // It's a backup line
+                    edge->max_load = min(sub1->max_limit, sub2->max_limit); // Max load is for info
+
+                    adj_power_substation[sub1].push_back({sub2, edge});
+                    adj_reverse_power[sub2].push_back({sub1, edge});
+                }
+            }
+        }
+    }
 
 } ;
