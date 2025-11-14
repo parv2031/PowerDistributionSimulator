@@ -238,4 +238,189 @@ public:
         }
     }
 
+public:
+    vector<pair<string, pair<int, int>>> layout_graph()
+    {
+        vector<pair<string, pair<int, int>>> coordinates_list;
+        unordered_set<Vertex_A *> visited_a;
+        unordered_set<Vertex_B *> visited_b;
+        queue<Vertex_A *> q; // Queue for BFS traversal
+
+        vector<Vertex_A *> power_plants;
+
+        using GridKey = std::pair<int, int>;
+        unordered_map<GridKey, vector<Vertex_A *>, PairHash> placed_a_grid;
+        unordered_map<GridKey, vector<Vertex_B *>, PairHash> placed_b_grid;
+
+        const int MAX_TRIES_PER_NODE = 1000;
+        const int PLANT_BOUNDS_MIN = 0;
+        const int PLANT_BOUNDS_MAX = 2000;
+        const int SUB_RANGE = 200;
+        const int CONSUMER_RANGE = 50;
+        const int CELL_SIZE = 50;
+
+        // --- 1. Collect Power Plants ---
+        for (auto const &map_entry : adj_power_substation)
+        {
+            if (map_entry.first->node_type == "power_plant")
+            {
+                power_plants.push_back(map_entry.first);
+            }
+        }
+
+        if (power_plants.empty())
+        {
+            cout << "No power plants found to start layout." << endl;
+            return coordinates_list;
+        }
+
+        // --- 2. Place Power Plants Randomly ---
+        for (auto *plant : power_plants)
+        {
+            if (visited_a.count(plant))
+                continue;
+
+            int tries = 0;
+            bool placed = false;
+            while (tries < MAX_TRIES_PER_NODE)
+            {
+                int x = GetRandom(PLANT_BOUNDS_MIN, PLANT_BOUNDS_MAX);
+                int y = GetRandom(PLANT_BOUNDS_MIN, PLANT_BOUNDS_MAX);
+
+                if (is_position_ok_A(plant, x, y, placed_a_grid, CELL_SIZE))
+                {
+                    plant->x = x;
+                    plant->y = y;
+                    coordinates_list.push_back({plant->node_type, {x, y}});
+                    visited_a.insert(plant);
+                    q.push(plant);
+
+                    int grid_x = x / CELL_SIZE;
+                    int grid_y = y / CELL_SIZE;
+                    placed_a_grid[{grid_x, grid_y}].push_back(plant);
+
+                    placed = true;
+                    break;
+                }
+                tries++;
+            }
+
+            if (!placed)
+            {
+                cout << "Warning: Failed to find ideal spot for power plant " << plant << ". Placing anyway.\n";
+                plant->x = GetRandom(PLANT_BOUNDS_MIN, PLANT_BOUNDS_MAX);
+                plant->y = GetRandom(PLANT_BOUNDS_MIN, PLANT_BOUNDS_MAX);
+                coordinates_list.push_back({plant->node_type, {plant->x, plant->y}});
+                visited_a.insert(plant);
+                q.push(plant);
+
+                int grid_x = plant->x / CELL_SIZE;
+                int grid_y = plant->y / CELL_SIZE;
+                placed_a_grid[{grid_x, grid_y}].push_back(plant);
+            }
+        }
+
+        // --- 3. Position Substations and Consumers (BFS) ---
+        while (!q.empty())
+        {
+            Vertex_A *parent = q.front();
+            q.pop();
+
+            // --- 3a. Place child A-nodes (substations) ---
+            if (adj_power_substation.count(parent))
+            {
+                for (auto &edge_pair : adj_power_substation[parent])
+                {
+                    Vertex_A *child_sub = edge_pair.first;
+                    if (child_sub->node_type == "substation" && visited_a.find(child_sub) == visited_a.end())
+                    {
+                        int tries = 0;
+                        bool placed = false;
+                        while (tries < MAX_TRIES_PER_NODE)
+                        {
+                            int x = GetRandom(parent->x - SUB_RANGE, parent->x + SUB_RANGE);
+                            int y = GetRandom(parent->y - SUB_RANGE, parent->y + SUB_RANGE);
+
+                            if (is_position_ok_A(child_sub, x, y, placed_a_grid, CELL_SIZE))
+                            {
+                                child_sub->x = x;
+                                child_sub->y = y;
+                                coordinates_list.push_back({child_sub->node_type, {x, y}});
+                                visited_a.insert(child_sub);
+                                q.push(child_sub);
+
+                                int grid_x = x / CELL_SIZE;
+                                int grid_y = y / CELL_SIZE;
+                                placed_a_grid[{grid_x, grid_y}].push_back(child_sub);
+
+                                placed = true;
+                                break;
+                            }
+                            tries++;
+                        }
+                        if (!placed)
+                        {
+                            child_sub->x = parent->x;
+                            child_sub->y = parent->y;
+                            coordinates_list.push_back({child_sub->node_type, {child_sub->x, child_sub->y}});
+                            visited_a.insert(child_sub);
+                            q.push(child_sub);
+
+                            int grid_x = child_sub->x / CELL_SIZE;
+                            int grid_y = child_sub->y / CELL_SIZE;
+                            placed_a_grid[{grid_x, grid_y}].push_back(child_sub);
+                        }
+                    }
+                }
+            }
+
+            // --- 3b. Place child B-nodes (consumers) ---
+            if (adj_substion_consumer.count(parent))
+            {
+                for (auto &edge_pair : adj_substion_consumer[parent])
+                {
+                    Vertex_B *consumer = edge_pair.first;
+                    if (visited_b.find(consumer) == visited_b.end())
+                    {
+                        int tries = 0;
+                        bool placed = false;
+                        while (tries < MAX_TRIES_PER_NODE)
+                        {
+                            int x = GetRandom(parent->x - CONSUMER_RANGE, parent->x + CONSUMER_RANGE);
+                            int y = GetRandom(parent->y - CONSUMER_RANGE, parent->y + CONSUMER_RANGE);
+
+                            if (is_position_ok_B(consumer, x, y, placed_b_grid, CELL_SIZE))
+                            {
+                                consumer->x = x;
+                                consumer->y = y;
+                                coordinates_list.push_back({consumer->node_type, {x, y}});
+                                visited_b.insert(consumer);
+
+                                int grid_x = x / CELL_SIZE;
+                                int grid_y = y / CELL_SIZE;
+                                placed_b_grid[{grid_x, grid_y}].push_back(consumer);
+
+                                placed = true;
+                                break;
+                            }
+                            tries++;
+                        }
+                        if (!placed)
+                        {
+                            consumer->x = parent->x;
+                            consumer->y = parent->y;
+                            coordinates_list.push_back({consumer->node_type, {consumer->x, consumer->y}});
+                            visited_b.insert(consumer);
+
+                            int grid_x = consumer->x / CELL_SIZE;
+                            int grid_y = consumer->y / CELL_SIZE;
+                            placed_b_grid[{grid_x, grid_y}].push_back(consumer);
+                        }
+                    }
+                }
+            }
+        }
+        return coordinates_list;
+    }
+
 } ;
