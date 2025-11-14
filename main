@@ -588,6 +588,46 @@ private:
         visited.erase(node);
         return all_parents_ok;
     }
+    // Helper function for the  "widest path" search 
+    void propagate_limit_increase(Vertex_A *node, float increase, unordered_set<Vertex_A *> &visited)
+    {
+        // This function propagates a capacity increase up the graph to parents
+        if (visited.count(node))
+        {
+            return; // Cycle detected
+        }
+        visited.insert(node);
+
+        // Find all parents 
+        if (!adj_reverse_power.count(node))
+        {
+            visited.erase(node);
+            return; // Is a power plant
+        }
+
+        for (auto &[parent_node, parent_edge] : adj_reverse_power[node])
+        {
+            float parent_increase = increase;
+
+            // Power plants get an extra 20% buffer, as per original mapping logic
+            if (parent_node->node_type == "power_plant")
+            {
+                parent_increase *= 1.2f;
+            }
+
+            // Increase the parent node's limit
+            parent_node->max_limit += parent_increase;
+
+            //update the max_load of the edge connecting them
+            parent_edge->max_load += increase;
+
+            // Recurse
+            propagate_limit_increase(parent_node, parent_increase, visited);
+        }
+
+        visited.erase(node); // Backtrack
+    }
+
     
 
 public:
