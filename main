@@ -254,6 +254,7 @@ public:
         }
     }
 private:   
+    // --- Helper Functions for Random Layout ---
     double GetDistance(int x1, int y1, int x2, int y2)
     {
         return sqrt(pow(static_cast<double>(x1 - x2), 2) + pow(static_cast<double>(y1 - y2), 2));
@@ -319,6 +320,72 @@ private:
         }
         return true;
     }
+    
+    bool DoesEdgeExist(Vertex_A *sub1, Vertex_A *sub2)
+    {
+        // Check A -> B
+        if (adj_power_substation.count(sub1))
+        {
+            for (auto &pair : adj_power_substation[sub1])
+            {
+                if (pair.first == sub2)
+                    return true;
+            }
+        }
+        // Check B -> A
+        if (adj_power_substation.count(sub2))
+        {
+            for (auto &pair : adj_power_substation[sub2])
+            {
+                if (pair.first == sub1)
+                    return true;
+            }
+        }
+        return false;
+    }
+    Edge *find_edge(Vertex_A *from, Vertex_A *to)
+    {
+        // Check from -> to
+        if (adj_power_substation.count(from))
+        {
+            for (const auto &neighbor_pair : adj_power_substation[from])
+            {
+                if (neighbor_pair.first == to)
+                {
+                    return neighbor_pair.second;
+                }
+            }
+        }
+
+        // Check to -> from
+        if (adj_power_substation.count(to))
+        {
+            for (const auto &neighbor_pair : adj_power_substation[to])
+            {
+                if (neighbor_pair.first == from)
+                {
+                    return neighbor_pair.second;
+                }
+            }
+        }
+
+        return nullptr; // No edge found in either direction
+    }
+    // Struct to hold state in our priority queue
+    struct PathState
+    {
+        float min_available_capacity;          // The bottleneck capacity of this path
+        vector<pair<Vertex_A *, Edge *>> path; // The path taken
+
+        // Constructor
+        PathState(float cap, vector<pair<Vertex_A *, Edge *>> p) : min_available_capacity(cap), path(std::move(p)) {}
+
+        // Comparator for the MAX-priority queue (highest capacity first)
+        bool operator<(const PathState &other) const
+        {
+            return min_available_capacity < other.min_available_capacity;
+        }
+    };
 
 public:
     vector<pair<string, pair<int, int>>> layout_graph()
@@ -832,5 +899,6 @@ public:
             return false; // No fix applied this tick
         }
     }
+    
 
 } ;
