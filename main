@@ -71,5 +71,43 @@ public:
             current_load = Node_2->demand;                                                            // Current load is the demand
         }
     };
+    unordered_map<Vertex_A *, vector<pair<Vertex_B *, Edge *>>> adj_substion_consumer; // adj list of substation to consumers
+    unordered_map<Vertex_A *, vector<pair<Vertex_A *, Edge *>>> adj_power_substation;  // adj list of substation to substaiton and power_plant to substations
+    unordered_map<Vertex_A *, vector<pair<Vertex_A *, Edge *>>> adj_reverse_power;
+    
+
+    // --- Graph Generation Functions ---
+    vector<int> distributor(int total_count, int divide_count)
+    {
+        if (divide_count <= 0)
+            return {};
+        vector<int> weights(divide_count);
+        int weightconsumers = 0;
+        int base = total_count / divide_count;
+        int minWeight = max(1, base - (3 * base) / 10); // 30% less than average
+        int maxWeight = max(1, base + (3 * base) / 10); // 30% more than average
+        for (int i = 0; i < divide_count; i++)
+        {
+            weights[i] = rand() % (maxWeight - minWeight + 1) + minWeight;
+            weightconsumers += weights[i];
+        }
+
+        if (weightconsumers == 0)
+        { // Avoid divide by zero
+            for (int i = 0; i < divide_count; i++)
+                weights[i] = 1;
+            weightconsumers = divide_count;
+        }
+
+        vector<int> distribution(divide_count);
+        int distributedconsumers = 0;
+        for (int i = 0; i < divide_count - 1; i++)
+        {
+            distribution[i] = (long long)weights[i] * total_count / weightconsumers;
+            distributedconsumers += distribution[i];
+        }
+        distribution[divide_count - 1] = total_count - distributedconsumers;
+        return distribution;
+    }
 
 } ;
