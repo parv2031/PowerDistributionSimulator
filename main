@@ -13,6 +13,18 @@ int resident_demand, hospital_demand, industry_demand, institute_demand;
 static random_device rd;
 static mt19937 g(rd());
 
+// A hash function for std::pair, required for the spatial grid
+struct PairHash
+{
+    template <class T1, class T2>
+    std::size_t operator()(const std::pair<T1, T2> &p) const
+    {
+        auto h1 = std::hash<T1>{}(p.first);
+        auto h2 = std::hash<T2>{}(p.second);
+        // A simple way to combine hashes
+        return h1 ^ (h2 << 1);
+    }
+};
 
 class graph{
 public:
