@@ -110,4 +110,20 @@ public:
         return distribution;
     }
 
+    void mapping(int powerplant_count, int substation_count, int consumer_count)
+    {
+        vector<Vertex_A *> powerplants;
+        for (int i = 0; i < powerplant_count; i++)
+            powerplants.push_back(new Vertex_A("power_plant"));
+        vector<Vertex_A *> substations;
+        vector<int> Substations = distributor(consumer_count, substation_count);
+        for (int val : Substations)
+        {
+            Vertex_A *s = new Vertex_A("substation");
+            substation_consumer_connector(s, val); // substation Vertex and number of consumers needs to be mapped with it
+            substations.push_back(s);
+        }
+        map_powerplants_to_substations(powerplants, substations);
+    }
+
 } ;
